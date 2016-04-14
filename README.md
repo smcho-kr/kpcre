@@ -1,4 +1,4 @@
-# kpcre2
+# kpcre
 
 PCRE linux kernel module &amp; PCRE based text search engine
 
@@ -39,25 +39,25 @@ That would install the pcre & ts_pcre modules for the given Linux kernel.
 Once you have installed both modules ("libpcre2-X.ko" and "ts_pcre.ko")
 you should type (as root):
 
-
+```
 modprobe ts_pcre
-
+```
 
 If the module has been successfully loaded you shouldn't see any message.
 After loading the kernel module you can use iptables to add a rule.
 
 An example rule would be (as root):
 
-
+```
 iptables -A INPUT -m string --string "/\x7C\x7C.+[a-z]/i" --algo pcre -j DROP
-
+```
 
 This wouldn't allow any incoming traffic that has the content matching the given PCRE in the payload.
 
 In case you want to stop using the ts_pcre kernel module, first remove every iptables rule for ts_pcre and then type (as root):
 
-
+```
 modprobe -r ts_pcre
-
+```
 
 You can also use PCRE library functions anywhere inside the kernel.
