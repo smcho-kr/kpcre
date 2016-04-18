@@ -323,7 +323,5 @@ static void __exit ts_regex_exit(void)
     textsearch_unregister(&regex_ops);
 }
 
-MODULE_LICENSE("GPL");
-
 module_init(ts_regex_init);
 module_exit(ts_regex_exit);
