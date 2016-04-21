@@ -1,6 +1,6 @@
 # kpcre
 
-PCRE linux kernel module &amp; PCRE based text search engine
+PCRE linux kernel module &amp; PCRE/REGEX based text search engine
 
 ### PCRE library kernel module (libpcre2-X.ko)
 
