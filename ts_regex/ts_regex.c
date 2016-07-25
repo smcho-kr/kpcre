@@ -66,7 +66,8 @@ static unsigned int regex_find(struct ts_config *conf, struct ts_state *state)
 
 	pr_debug("%s: finding |%s| at offset %u", __func__, regex->pattern, consumed);
 
-	/* FIXME: can't handle properly text with NULL inside */
+	/* POSIX regex functions deal with only null-terminated strings.   */
+	/* They can't properly handle patterns with null character inside. */
 	for (;;) {
 
 		text_len = conf->get_next_block(consumed, &text, conf, state);

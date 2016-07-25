@@ -1,6 +1,6 @@
-# kpcre
+# PCRE linux kernel module &amp; PCRE/REGEX based text search engine
 
-PCRE linux kernel module &amp; PCRE based text search engine
+Keywords: Netfilter iptables PCRE REGEX Linux Kernel Module
 
 ### PCRE library kernel module (libpcre2-X.ko)
 
@@ -60,4 +60,4 @@ In case you want to stop using the ts_pcre kernel module, first remove every ipt
 modprobe -r ts_pcre
 ```
 
-You can also use PCRE library functions anywhere inside the kernel.
+There is also a REGEX text search engine. (ts_regex.ko)
