@@ -18,7 +18,7 @@ This is a new text search engine based on the PCRE kernel module.
 
 ### Installing
 
-The install the modules follow these steps, always from the modules package root (i.e. where this file is located)
+To install the modules follow these steps, always from the modules package root (i.e. where this file is located)
 
 To compile the modules first type:
 
