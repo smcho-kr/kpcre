@@ -8,7 +8,7 @@ The PCRE library is a set of functions that implement regular expression pattern
 PCRE has its own native API, as well as a set of wrapper functions that correspond to the POSIX regular expression API. 
 
 This is a PCRE2 library ported to linux kernel.
-It is a full-fledged PCRE kernel module which supports JIT mode.
+It is a full-fledged PCRE kernel module which supports JIT(Just-in-time) compilation.
 
 Original sources: ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre
 
