@@ -54,6 +54,7 @@ pcre2test.c with CODE_UNIT_WIDTH == 0. */
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 #include "libc.h"
 #else
 /* Standard C headers */
