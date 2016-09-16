@@ -216,7 +216,6 @@ static struct ts_config *regex_init(const void *pattern, unsigned int len,
 	struct ts_config *conf;
 	struct ts_regex *regex;
 	size_t priv_size = sizeof(struct ts_regex);
-	int save = offsetof(struct ts_regex, patlen);
 	int rc;
 
 	pr_debug("%s: %d|%s|", __func__, len, (char *)pattern);
@@ -250,12 +249,14 @@ static struct ts_config *regex_init(const void *pattern, unsigned int len,
 	return conf;
 
  err_regcomp:
-	pr_debug("%s: %s", __func__, "err_regcomp");
+	pr_info("%s: %s", __func__, "err_regcomp");
 
  err_pattern:
-	memset(ts_config_priv(conf) + save, 0, sizeof(struct ts_regex) - save);
+	pr_info("%s: %s", __func__, "err_pattern");
+	free(regex->pattern);
+	free(conf);
 
-	return conf;
+	return ERR_PTR(-EINVAL);
 }
 
 static void regex_destroy(struct ts_config *conf)
@@ -266,14 +267,16 @@ static void regex_destroy(struct ts_config *conf)
 
 	pr_debug("%s: %s", __func__, regex->pattern);
 
-    if(regex->pattern)
+    if (regex->pattern)
 		free(regex->pattern);
 
-    if(regex->pcre)
+    if (regex->pcre)
 		pcre2_substring_free(regex->pcre);
 
-    if(regex->op_str)
+    if (regex->op_str)
 		pcre2_substring_free(regex->op_str);
+
+	regfree(&regex->re);
 }
 
 static void *regex_get_pattern(struct ts_config *conf)

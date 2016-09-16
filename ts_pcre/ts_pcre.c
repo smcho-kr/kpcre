@@ -201,7 +201,6 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 	PCRE2_SIZE erroffset;
 	int errorcode, rc;
 	size_t priv_size = sizeof(struct ts_pcre);
-	int save = offsetof(struct ts_pcre, patlen);
 
 	pr_debug("%s: %d|%s|", __func__, len, (char *)pattern);
 
@@ -255,27 +254,28 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 	return conf;
 
  err_match_data:
-	pr_debug("%s: %s", __func__, "err_match_data");
+	pr_info("%s: %s", __func__, "err_match_data");
 	if (sysctl_jit_enable)
 		pcre2_jit_stack_free(pcre->jit_stack);
 
  err_jit_stack:
-	pr_debug("%s: %s", __func__, "err_jit_stack");
+	pr_info("%s: %s", __func__, "err_jit_stack");
 	if (sysctl_jit_enable)
 		pcre2_match_context_free(pcre->mcontext);
 
  err_match_context:
-	pr_debug("%s: %s", __func__, "err_match_context");
+	pr_info("%s: %s", __func__, "err_match_context");
 	pcre2_code_free(pcre->re);
 
  err_code:
-	pr_debug("%s: %s", __func__, "err_code");
-	free(pcre->pattern);
+	pr_info("%s: %s", __func__, "err_code");
 
  err_pattern:
-	memset(ts_config_priv(conf) + save, 0, sizeof(struct ts_pcre) - save);
+	pr_info("%s: %s", __func__, "err_pattern");
+	free(pcre->pattern);
+	kfree(conf);
 
-	return conf;
+	return ERR_PTR(-EINVAL);
 }
 
 static void pcre_destroy(struct ts_config *conf)
