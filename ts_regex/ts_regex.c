@@ -213,49 +213,51 @@ static inline void opts_parse(char *op_str, int *copts, int *eopts)
 static struct ts_config *regex_init(const void *pattern, unsigned int len,
 				    gfp_t gfp_mask, int flags)
 {
-	struct ts_config *conf;
-	struct ts_regex *regex;
+	struct ts_config *conf = ERR_PTR(-EINVAL);
+	struct ts_regex regex;
 	size_t priv_size = sizeof(struct ts_regex);
-	int save = offsetof(struct ts_regex, patlen);
 	int rc;
 
-	pr_debug("%s: %d|%s|", __func__, len, (char *)pattern);
+	pr_debug("%s: |%s|", __func__, (char *)pattern);
 
-	conf = alloc_ts_config(priv_size, gfp_mask);
-	if (IS_ERR(conf))
-		return conf;
+	regex.copts = REG_EXTENDED;
+	regex.eopts = 0;
+	regex.patlen = len;
+	regex.pattern = calloc(len + 1, sizeof(u8));
 
-	conf->flags = flags;
-	regex = ts_config_priv(conf);
-	regex->copts = REG_EXTENDED;
-	regex->eopts = 0;
-	regex->patlen = len;
-	regex->pattern = calloc(len + 1, sizeof(u8));
-
-	if (IS_ERR_OR_NULL(regex->pattern))
+	if (IS_ERR_OR_NULL(regex.pattern))
 		goto err_pattern;
 
-	memcpy(regex->pattern, pattern, len);
+	memcpy(regex.pattern, pattern, len);
 
-    rc = pattern_parse((char *)pattern, &regex->pcre, &regex->op_str);
+    rc = pattern_parse((char *)pattern, &regex.pcre, &regex.op_str);
     if (rc < 0)
         goto err_pattern;
 
-    opts_parse(regex->op_str, &regex->copts, &regex->eopts);
+    opts_parse(regex.op_str, &regex.copts, &regex.eopts);
 
-	rc = regcomp(&regex->re, regex->pcre, regex->copts);
+	rc = regcomp(&regex.re, regex.pcre, regex.copts);
 	if (rc)
 		goto err_regcomp;
 
+	conf = alloc_ts_config(priv_size, gfp_mask);
+	if (IS_ERR(conf))
+		goto err_alloc_conf;
+
+	conf->flags = flags;
+	memcpy(ts_config_priv(conf), &regex, priv_size);
+
 	return conf;
 
+ err_alloc_conf:
  err_regcomp:
-	pr_debug("%s: %s", __func__, "err_regcomp");
+	pr_info("%s: %s", __func__, "err_regcomp");
 
  err_pattern:
-	memset(ts_config_priv(conf) + save, 0, sizeof(struct ts_regex) - save);
+	pr_info("%s: %s", __func__, "err_pattern");
+	free(regex.pattern);
 
-	return conf;
+	return ERR_PTR(-EINVAL);
 }
 
 static void regex_destroy(struct ts_config *conf)
@@ -266,14 +268,16 @@ static void regex_destroy(struct ts_config *conf)
 
 	pr_debug("%s: %s", __func__, regex->pattern);
 
-    if(regex->pattern)
+    if (regex->pattern)
 		free(regex->pattern);
 
-    if(regex->pcre)
+    if (regex->pcre)
 		pcre2_substring_free(regex->pcre);
 
-    if(regex->op_str)
+    if (regex->op_str)
 		pcre2_substring_free(regex->op_str);
+
+	regfree(&regex->re);
 }
 
 static void *regex_get_pattern(struct ts_config *conf)

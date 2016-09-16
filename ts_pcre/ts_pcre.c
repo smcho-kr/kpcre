@@ -196,84 +196,85 @@ static inline void opts_parse(char *op_str, int *_opts)
 static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 				   gfp_t gfp_mask, int flags)
 {
-	struct ts_config *conf;
-	struct ts_pcre *pcre;
+	struct ts_config *conf = ERR_PTR(-EINVAL);
+	struct ts_pcre pcre;
 	PCRE2_SIZE erroffset;
 	int errorcode, rc;
 	size_t priv_size = sizeof(struct ts_pcre);
-	int save = offsetof(struct ts_pcre, patlen);
 
-	pr_debug("%s: %d|%s|", __func__, len, (char *)pattern);
+	pr_debug("%s: |%s|", __func__, (char *)pattern);
 
-	conf = alloc_ts_config(priv_size, gfp_mask);
-	if (IS_ERR(conf))
-		return conf;
+	pcre.patlen = len;
+	pcre.pattern = calloc(len + 1, sizeof(u8));
 
-	conf->flags = flags;
-	pcre = ts_config_priv(conf);
-	pcre->patlen = len;
-	pcre->pattern = calloc(len + 1, sizeof(u8));
-
-	if (IS_ERR_OR_NULL(pcre->pattern))
+	if (IS_ERR_OR_NULL(pcre.pattern))
 		goto err_pattern;
 
-	memcpy(pcre->pattern, pattern, len);
+	memcpy(pcre.pattern, pattern, len);
 
-	rc = pattern_parse((char *)pattern, &pcre->pcre, &pcre->op_str);
+	rc = pattern_parse((char *)pattern, &pcre.pcre, &pcre.op_str);
 	if (rc < 0)
 		goto err_pattern;
 
-	opts_parse(pcre->op_str, &pcre->opts);
+	opts_parse(pcre.op_str, &pcre.opts);
 
-	pcre->re = pcre2_compile(pcre->pcre, PCRE2_ZERO_TERMINATED, pcre->opts,
+	pcre.re = pcre2_compile(pcre.pcre, PCRE2_ZERO_TERMINATED, pcre.opts,
 				 &errorcode, &erroffset, NULL);
-	if (IS_ERR_OR_NULL(pcre->re))
+	if (IS_ERR_OR_NULL(pcre.re))
 		goto err_code;
 
 	if (sysctl_jit_enable) {
-		pcre->mcontext = pcre2_match_context_create(NULL);
-		if (IS_ERR_OR_NULL(pcre->mcontext))
+		pcre.mcontext = pcre2_match_context_create(NULL);
+		if (IS_ERR_OR_NULL(pcre.mcontext))
 			goto err_match_context;
 
-		rc = pcre2_jit_compile(pcre->re, PCRE2_JIT_COMPLETE);
+		rc = pcre2_jit_compile(pcre.re, PCRE2_JIT_COMPLETE);
 		if (rc < 0)
 			goto err_match_context;
 
-		pcre->jit_stack = pcre2_jit_stack_create(\
+		pcre.jit_stack = pcre2_jit_stack_create(\
 			sysctl_jit_stack_start * 1024,
 			sysctl_jit_stack_max * 1024, NULL);
-		if (IS_ERR_OR_NULL(pcre->jit_stack))
+		if (IS_ERR_OR_NULL(pcre.jit_stack))
 			goto err_jit_stack;
 
-		pcre2_jit_stack_assign(pcre->mcontext, NULL, pcre->jit_stack);
+		pcre2_jit_stack_assign(pcre.mcontext, NULL, pcre.jit_stack);
 	}
 
-	pcre->match_data = pcre2_match_data_create(1, NULL);
-	if (IS_ERR_OR_NULL(pcre->match_data))
+	pcre.match_data = pcre2_match_data_create(1, NULL);
+	if (IS_ERR_OR_NULL(pcre.match_data))
 		goto err_match_data;
+
+	conf = alloc_ts_config(priv_size, gfp_mask);
+	if (IS_ERR(conf))
+		goto err_alloc_conf;
+
+	conf->flags = flags;
+	memcpy(ts_config_priv(conf), &pcre, priv_size);
 
 	return conf;
 
+ err_alloc_conf:
  err_match_data:
-	pr_debug("%s: %s", __func__, "err_match_data");
+	pr_info("%s: %s", __func__, "err_match_data");
 	if (sysctl_jit_enable)
-		pcre2_jit_stack_free(pcre->jit_stack);
+		pcre2_jit_stack_free(pcre.jit_stack);
 
  err_jit_stack:
-	pr_debug("%s: %s", __func__, "err_jit_stack");
+	pr_info("%s: %s", __func__, "err_jit_stack");
 	if (sysctl_jit_enable)
-		pcre2_match_context_free(pcre->mcontext);
+		pcre2_match_context_free(pcre.mcontext);
 
  err_match_context:
-	pr_debug("%s: %s", __func__, "err_match_context");
-	pcre2_code_free(pcre->re);
+	pr_info("%s: %s", __func__, "err_match_context");
+	pcre2_code_free(pcre.re);
 
  err_code:
-	pr_debug("%s: %s", __func__, "err_code");
-	free(pcre->pattern);
+	pr_info("%s: %s", __func__, "err_code");
 
  err_pattern:
-	memset(ts_config_priv(conf) + save, 0, sizeof(struct ts_pcre) - save);
+	pr_info("%s: %s", __func__, "err_pattern");
+	free(pcre.pattern);
 
 	return conf;
 }
