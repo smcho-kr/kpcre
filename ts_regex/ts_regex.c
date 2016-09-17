@@ -109,7 +109,7 @@ pattern_parse(const char *pattern, PCRE2_UCHAR ** pcre, PCRE2_UCHAR ** op_str)
 
     res = pcre2_match(parse_regex, pattern, -1, 0, 0, match_data, NULL);
     if (res <= 0) {
-        pr_debug("%s: invalid pattern", __func__);
+        pr_debug("%s: pcre2_match failed", __func__);
         pcre2_match_data_free(match_data);
         return -EINVAL;
     }
