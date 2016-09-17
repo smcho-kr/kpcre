@@ -49,7 +49,7 @@ static pcre2_code *parse_regex;
 struct ts_regex {
 	u8 *pattern;
 	unsigned int patlen;
-	PCRE2_UCHAR	*pcre;
+	PCRE2_UCHAR	*regex_str;
 	PCRE2_UCHAR	*op_str;
 	regex_t re;
 	regmatch_t subs[NS];
@@ -197,7 +197,7 @@ static inline void opts_parse(char *op_str, int *copts, int *eopts)
                 break;
 
             default:
-                pr_debug("%s: unknown regex modifier '%c'",
+                pr_info("%s: unknown regex modifier '%c'",
                      __func__, *op);
                 break;
             }
@@ -225,24 +225,32 @@ static struct ts_config *regex_init(const void *pattern, unsigned int len,
 	regex.patlen = len;
 	regex.pattern = calloc(len + 1, sizeof(u8));
 
-	if (IS_ERR_OR_NULL(regex.pattern))
+	if (IS_ERR_OR_NULL(regex.pattern)) {
+		pr_debug("%s: %s", __func__, "err_pattern");
 		goto err_pattern;
+	}
 
 	memcpy(regex.pattern, pattern, len);
 
-    rc = pattern_parse((char *)pattern, &regex.pcre, &regex.op_str);
-    if (rc < 0)
-        goto err_pattern;
+    rc = pattern_parse((char *)pattern, &regex.regex_str, &regex.op_str);
+    if (rc < 0) {
+		pr_debug("%s: %s", __func__, "err_pattern_parse");
+        goto err_pattern_parse;
+	}
+	pr_debug("%s: |%s|%s|", __func__, regex.regex_str, regex.op_str);
 
     opts_parse(regex.op_str, &regex.copts, &regex.eopts);
 
-	rc = regcomp(&regex.re, regex.pcre, regex.copts);
-	if (rc)
+	rc = regcomp(&regex.re, regex.regex_str, regex.copts);
+	if (rc) {
+		pr_debug("%s: %s", __func__, "err_regcomp");
 		goto err_regcomp;
+	}
 
 	conf = alloc_ts_config(priv_size, gfp_mask);
-	if (IS_ERR(conf))
+	if (IS_ERR(conf)) {
 		goto err_alloc_conf;
+	}
 
 	conf->flags = flags;
 	memcpy(ts_config_priv(conf), &regex, priv_size);
@@ -251,13 +259,12 @@ static struct ts_config *regex_init(const void *pattern, unsigned int len,
 
  err_alloc_conf:
  err_regcomp:
-	pr_info("%s: %s", __func__, "err_regcomp");
-
+ err_pattern_parse:
  err_pattern:
-	pr_info("%s: %s", __func__, "err_pattern");
 	free(regex.pattern);
 
-	return ERR_PTR(-EINVAL);
+	pr_info("%s failed: it's probably a regex pattern error", __func__);
+	return conf;
 }
 
 static void regex_destroy(struct ts_config *conf)
@@ -271,8 +278,8 @@ static void regex_destroy(struct ts_config *conf)
     if (regex->pattern)
 		free(regex->pattern);
 
-    if (regex->pcre)
-		pcre2_substring_free(regex->pcre);
+    if (regex->regex_str)
+		pcre2_substring_free(regex->regex_str);
 
     if (regex->op_str)
 		pcre2_substring_free(regex->op_str);

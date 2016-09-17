@@ -50,7 +50,7 @@ static int sysctl_jit_stack_max = 64; /* KB */
 struct ts_pcre {
 	u8 *pattern;
 	unsigned int patlen;
-	PCRE2_UCHAR *pcre;
+	PCRE2_UCHAR *pcre_str;
 	PCRE2_UCHAR *op_str;
 	pcre2_code *re;
 	pcre2_match_data *match_data;
@@ -67,7 +67,7 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 	unsigned int match, text_len, consumed = state->offset;
 	int rc;
 
-	pr_debug("%s: finding |%s| at offset %u", __func__, pcre->pcre, consumed);
+	pr_debug("%s: finding |%s| at offset %u", __func__, pcre->pcre_str, consumed);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
@@ -82,7 +82,7 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 			ovector = pcre2_get_ovector_pointer(pcre->match_data);
 			match = consumed + ovector[0];
 //			state->offset = consumed + ovector[1];
-			pr_debug("%s: matched |%s| at offset %u", __func__, pcre->pcre, match);
+			pr_debug("%s: matched |%s| at offset %u", __func__, pcre->pcre_str, match);
 			return match;
 		}
 
@@ -107,7 +107,7 @@ pattern_parse(const char *pattern, PCRE2_UCHAR ** pcre, PCRE2_UCHAR ** op_str)
 
 	res = pcre2_match(parse_regex, pattern, -1, 0, 0, match_data, NULL);
 	if (res <= 0) {
-		pr_debug("%s: invalid pattern", __func__);
+		pr_debug("%s: pcre2_match failed", __func__);
 		pcre2_match_data_free(match_data);
 		return -EINVAL;
 	}
@@ -182,7 +182,7 @@ static inline void opts_parse(char *op_str, int *_opts)
 				break;
 
 			default:
-				pr_debug("%s: unknown regex modifier '%c'",
+				pr_info("%s: unknown regex modifier '%c'",
 					 __func__, *op);
 				break;
 			}
@@ -207,47 +207,64 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 	pcre.patlen = len;
 	pcre.pattern = calloc(len + 1, sizeof(u8));
 
-	if (IS_ERR_OR_NULL(pcre.pattern))
+	if (IS_ERR_OR_NULL(pcre.pattern)) {
+		pr_debug("%s: %s", __func__, "err_pattern");
 		goto err_pattern;
+	}
 
 	memcpy(pcre.pattern, pattern, len);
 
-	rc = pattern_parse((char *)pattern, &pcre.pcre, &pcre.op_str);
-	if (rc < 0)
-		goto err_pattern;
+	rc = pattern_parse((char *)pattern, &pcre.pcre_str, &pcre.op_str);
+	if (rc < 0) {
+		pr_debug("%s: %s", __func__, "err_pattern_parse");
+		goto err_pattern_parse;
+	}
+	pr_debug("%s: |%s|%s|", __func__, pcre.pcre_str, pcre.op_str);
 
 	opts_parse(pcre.op_str, &pcre.opts);
 
-	pcre.re = pcre2_compile(pcre.pcre, PCRE2_ZERO_TERMINATED, pcre.opts,
+	pcre.re = pcre2_compile(pcre.pcre_str, PCRE2_ZERO_TERMINATED, pcre.opts,
 				 &errorcode, &erroffset, NULL);
-	if (IS_ERR_OR_NULL(pcre.re))
-		goto err_code;
+	if (IS_ERR_OR_NULL(pcre.re)) {
+		pr_debug("%s: %s", __func__, "err_pcre_compile");
+		goto err_pcre_compile;
+	}
 
 	if (sysctl_jit_enable) {
 		pcre.mcontext = pcre2_match_context_create(NULL);
-		if (IS_ERR_OR_NULL(pcre.mcontext))
+		if (IS_ERR_OR_NULL(pcre.mcontext)) {
+			pr_debug("%s: %s", __func__, "err_match_context");
 			goto err_match_context;
+		}
 
 		rc = pcre2_jit_compile(pcre.re, PCRE2_JIT_COMPLETE);
-		if (rc < 0)
-			goto err_match_context;
+		if (rc < 0) {
+			pr_debug("%s: %s", __func__, "err_jit_compile");
+			goto err_jit_compile;
+		}
 
 		pcre.jit_stack = pcre2_jit_stack_create(\
 			sysctl_jit_stack_start * 1024,
 			sysctl_jit_stack_max * 1024, NULL);
-		if (IS_ERR_OR_NULL(pcre.jit_stack))
+		if (IS_ERR_OR_NULL(pcre.jit_stack)) {
+			pr_debug("%s: %s", __func__, "err_jit_stack");
 			goto err_jit_stack;
+		}
 
 		pcre2_jit_stack_assign(pcre.mcontext, NULL, pcre.jit_stack);
 	}
 
 	pcre.match_data = pcre2_match_data_create(1, NULL);
-	if (IS_ERR_OR_NULL(pcre.match_data))
+	if (IS_ERR_OR_NULL(pcre.match_data)) {
+		pr_debug("%s: %s", __func__, "err_match_data");
 		goto err_match_data;
+	}
 
 	conf = alloc_ts_config(priv_size, gfp_mask);
-	if (IS_ERR(conf))
+	if (IS_ERR(conf)) {
+		pr_debug("%s: %s", __func__, "err_alloc_conf");
 		goto err_alloc_conf;
+	}
 
 	conf->flags = flags;
 	memcpy(ts_config_priv(conf), &pcre, priv_size);
@@ -256,26 +273,24 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 
  err_alloc_conf:
  err_match_data:
-	pr_info("%s: %s", __func__, "err_match_data");
 	if (sysctl_jit_enable)
 		pcre2_jit_stack_free(pcre.jit_stack);
 
  err_jit_stack:
-	pr_info("%s: %s", __func__, "err_jit_stack");
 	if (sysctl_jit_enable)
 		pcre2_match_context_free(pcre.mcontext);
 
+ err_jit_compile:
  err_match_context:
-	pr_info("%s: %s", __func__, "err_match_context");
 	pcre2_code_free(pcre.re);
 
- err_code:
-	pr_info("%s: %s", __func__, "err_code");
+ err_pcre_compile:
 
+ err_pattern_parse:
  err_pattern:
-	pr_info("%s: %s", __func__, "err_pattern");
 	free(pcre.pattern);
 
+	pr_info("%s failed: it's probably a regex pattern error", __func__);
 	return conf;
 }
 
@@ -302,8 +317,8 @@ static void pcre_destroy(struct ts_config *conf)
 	if (pcre->jit_stack)
 		pcre2_jit_stack_free(pcre->jit_stack);
 
-	if (pcre->pcre)
-		pcre2_substring_free(pcre->pcre);
+	if (pcre->pcre_str)
+		pcre2_substring_free(pcre->pcre_str);
 
 	if (pcre->op_str)
 		pcre2_substring_free(pcre->op_str);
