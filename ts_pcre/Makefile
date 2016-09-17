@@ -4,7 +4,7 @@ LIBC := ${PWD}/../libc
 PCRE2 := ${PWD}/../pcre2
 
 ifeq ($(KLIBS_DEBUG), 1)
-ccflags-y += -ggdb -O0 -DDEBUG
+ccflags-y += -ggdb -DDEBUG
 else
 ccflags-y += -O2 -s
 endif
