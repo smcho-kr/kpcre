@@ -16,6 +16,14 @@ Original sources: ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre
 
 This is a new text search engine based on the PCRE kernel module.
 
+### Getting the source code
+
+To get the source code from the git repository
+
+```
+git clone https://github.com/xnsystems/kpcre.git
+```
+
 ### Installing
 
 To install the modules follow these steps, always from the modules package root (i.e. where this file is located)
@@ -33,6 +41,8 @@ make modules_install
 ```
 
 That would install the pcre & ts_pcre modules for the given Linux kernel.
+
+For more detailed instructions on how to build and install the kernel modules, refer to [the installation guide](https://github.com/xnsystems/kpcre/wiki/Step-by-step-installation-guide).
 
 ### Usage
 
