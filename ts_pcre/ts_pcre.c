@@ -79,7 +79,7 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 	struct ts_pcre *pcre = ts_config_priv(conf);
 	const u8 *text;
 	unsigned int match, text_len, consumed = state->offset;
-	struct pcre_match_args *p = &__get_cpu_var(pcre_match_args);
+	struct pcre_match_args *p = &get_cpu_var(pcre_match_args);
 	int rc;
 
 	for (;;) {
