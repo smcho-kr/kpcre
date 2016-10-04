@@ -39,7 +39,7 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Seongmyun Cho <highsky@gmail.com>");
-MODULE_DESCRIPTION("ts_regex");
+MODULE_DESCRIPTION("REGEX text search engine");
 
 #define PARSE_REGEX         "(?<!\\\\)/(.*(?<!(?<!\\\\)\\\\))/([^\"]*)"
 
