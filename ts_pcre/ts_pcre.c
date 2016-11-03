@@ -44,7 +44,7 @@ MODULE_DESCRIPTION("PCRE text search engine");
 
 static pcre2_code *parse_regex;
 
-static bool jit_enable __read_mostly = true;
+static bool jit_enable __read_mostly = false;
 module_param_named(jit, jit_enable, bool, 0444);
 MODULE_PARM_DESC(jit, " enable JIT(just in time) compilation.");
 
@@ -366,7 +366,7 @@ static int __init ts_pcre_init(void)
 	if (parse_regex == NULL)
 		goto err_compile;
 
-    for_each_possible_cpu(i) {
+    for_each_online_cpu(i) {
         struct pcre_match_args *p; 
 
         p = &per_cpu(pcre_match_args, i); 
@@ -389,7 +389,7 @@ static void __exit ts_pcre_exit(void)
 	int i;
 	pr_debug("%s", __func__);
 
-    for_each_possible_cpu(i) {
+    for_each_online_cpu(i) {
         struct pcre_match_args *p; 
 
         p = &per_cpu(pcre_match_args, i); 
