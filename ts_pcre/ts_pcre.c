@@ -44,7 +44,7 @@ MODULE_DESCRIPTION("PCRE text search engine");
 
 static pcre2_code *parse_regex;
 
-static bool jit_enable __read_mostly = false;
+static bool jit_enable __read_mostly = true;
 module_param_named(jit, jit_enable, bool, 0444);
 MODULE_PARM_DESC(jit, " enable JIT(just in time) compilation.");
 
@@ -65,13 +65,9 @@ struct ts_pcre {
 	int opts;
 };
 
-struct pcre_match_args {
-	pcre2_match_data *match_data;
-	pcre2_match_context *mcontext;
-	pcre2_jit_stack *jit_stack;
-};
-
-static DEFINE_PER_CPU(struct pcre_match_args, pcre_match_args);
+static DEFINE_PER_CPU(pcre2_match_data *, match_data);
+static DEFINE_PER_CPU(pcre2_match_context *, match_context);
+static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
 
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
@@ -79,7 +75,8 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 	struct ts_pcre *pcre = ts_config_priv(conf);
 	const u8 *text;
 	unsigned int match, text_len, consumed = state->offset;
-	struct pcre_match_args *p = &get_cpu_var(pcre_match_args);
+	pcre2_match_data *_match_data = get_cpu_var(match_data);
+	pcre2_match_context *_mcontext = get_cpu_var(match_context);
 	int rc;
 
 	for (;;) {
@@ -89,7 +86,7 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 			break;
 
 		rc = pcre2_match(pcre->re, text, text_len, 0, 0,
-				 p->match_data, p->mcontext);
+				 _match_data, _mcontext);
 
 		if (unlikely(rc >= 0)) {
 #ifdef DEBUG
@@ -97,13 +94,13 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 			PCRE2_SIZE	slen;
 			int i;
 
-			rc = pcre2_substring_get_bynumber(p->match_data, 0, \
+			rc = pcre2_substring_get_bynumber(_match_data, 0, \
 					&str, &slen);
 
 			if (rc < 0) {
 				pr_debug("%s: pcre2_substring_get_bynumber(pcre) failed",
 					 __func__);
-				return UINT_MAX;
+				break;
 			} else {
 				printk("\n");
 				for (i = 0; i < slen; i++) {
@@ -117,18 +114,25 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 				pcre2_substring_free(str);
 			}
 #endif
-			ovector = pcre2_get_ovector_pointer(p->match_data);
+			ovector = pcre2_get_ovector_pointer(_match_data);
 			match = consumed + ovector[0];
 //			state->offset = consumed + ovector[1];
 			pr_debug("%s: matched |%s| at offset %u", __func__, pcre->pcre_str, match);
-			return match;
+			goto found;
 		}
 
 		consumed += text_len;
 //		state->offset = consumed;
 	}
 
+	put_cpu_var(match_data);
+	put_cpu_var(match_context);
 	return UINT_MAX;
+
+found:
+	put_cpu_var(match_data);
+	put_cpu_var(match_context);
+	return match;
 }
 
 static inline int
@@ -367,15 +371,17 @@ static int __init ts_pcre_init(void)
 		goto err_compile;
 
     for_each_online_cpu(i) {
-        struct pcre_match_args *p; 
+		pcre2_match_data *_match_data = per_cpu(match_data, i);
+		pcre2_match_context *_mcontext = per_cpu(match_context, i);
+		pcre2_jit_stack *_jit_stack = per_cpu(jit_stack, i);
 
-        p = &per_cpu(pcre_match_args, i); 
-		p->match_data = pcre2_match_data_create(1, NULL);
-		p->mcontext = pcre2_match_context_create(NULL);
-		p->jit_stack = pcre2_jit_stack_create( \
+		_match_data = pcre2_match_data_create(1, NULL);
+		_mcontext = pcre2_match_context_create(NULL);
+		_jit_stack = pcre2_jit_stack_create( \
 			jit_stack_start, jit_stack_max, NULL);
 
-		pcre2_jit_stack_assign(p->mcontext, NULL, p->jit_stack);
+//		pcre2_jit_stack_assign(_mcontext, NULL, _jit_stack);
+		pcre2_jit_stack_assign(_mcontext, NULL, NULL);
     }   
 
 	return textsearch_register(&pcre_ops);
@@ -390,12 +396,13 @@ static void __exit ts_pcre_exit(void)
 	pr_debug("%s", __func__);
 
     for_each_online_cpu(i) {
-        struct pcre_match_args *p; 
+		pcre2_match_data *_match_data = per_cpu(match_data, i);
+		pcre2_match_context *_mcontext = per_cpu(match_context, i);
+		pcre2_jit_stack *_jit_stack = per_cpu(jit_stack, i);
 
-        p = &per_cpu(pcre_match_args, i); 
-		pcre2_match_data_free(p->match_data);
-		pcre2_match_context_free(p->mcontext);
-		pcre2_jit_stack_free(p->jit_stack);
+		pcre2_match_data_free(_match_data);
+		pcre2_match_context_free(_mcontext);
+		pcre2_jit_stack_free(_jit_stack);
     }   
 
 	if (parse_regex)

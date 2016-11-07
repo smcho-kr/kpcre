@@ -429,7 +429,7 @@ if (unlikely(local_workspace == NULL))
 #endif
 
 rlevel++;
-offsetcount &= (-2);
+offsetcount &= (uint32_t)(-2);  /* Round down */
 
 wscount -= 2;
 wscount = (wscount - (wscount % (INTS_PER_STATEBLOCK * 2))) /
@@ -467,7 +467,7 @@ if (*first_op == OP_REVERSE)
   end_code = this_start_code;
   do
     {
-    size_t back = GET(end_code, 2+LINK_SIZE);
+    size_t back = (size_t)GET(end_code, 2+LINK_SIZE);
     if (back > max_back) max_back = back;
     end_code += GET(end_code, 1);
     }
@@ -509,11 +509,11 @@ if (*first_op == OP_REVERSE)
   end_code = this_start_code;
   do
     {
-    size_t back = GET(end_code, 2+LINK_SIZE);
+    size_t back = (size_t)GET(end_code, 2+LINK_SIZE);
     if (back <= gone_back)
       {
       int bstate = (int)(end_code - start_code + 2 + 2*LINK_SIZE);
-      ADD_NEW_DATA(-bstate, 0, gone_back - back);
+      ADD_NEW_DATA(-bstate, 0, (int)(gone_back - back));
       }
     end_code += GET(end_code, 1);
     }
@@ -537,7 +537,7 @@ else
     do { end_code += GET(end_code, 1); } while (*end_code == OP_ALT);
     new_count = workspace[1];
     if (!workspace[0])
-      memcpy(new_states, active_states, new_count * sizeof(stateblock));
+      memcpy(new_states, active_states, (size_t)new_count * sizeof(stateblock));
     }
 
   /* Not restarting */
@@ -621,8 +621,9 @@ for (;;)
     stateblock *current_state = active_states + i;
     BOOL caseless = FALSE;
     PCRE2_SPTR code;
+    uint32_t codevalue;
     int state_offset = current_state->offset;
-    int codevalue, rrc;
+    int rrc;
     int count;
 
     /* A negative offset is a special case meaning "hold off going to this
@@ -747,7 +748,7 @@ for (;;)
         ADD_ACTIVE(state_offset + 1 + LINK_SIZE, 0);
         if (codevalue != OP_KET)
           {
-          ADD_ACTIVE(state_offset - GET(code, 1), 0);
+          ADD_ACTIVE(state_offset - (int)GET(code, 1), 0);
           }
         }
       else
@@ -761,11 +762,12 @@ for (;;)
             else if (match_count > 0 && ++match_count * 2 > (int)offsetcount)
               match_count = 0;
           count = ((match_count == 0)? (int)offsetcount : match_count * 2) - 2;
-          if (count > 0) memmove(offsets + 2, offsets, count * sizeof(PCRE2_SIZE));
+          if (count > 0) memmove(offsets + 2, offsets,
+            (size_t)count * sizeof(PCRE2_SIZE));
           if (offsetcount >= 2)
             {
-            offsets[0] = (int)(current_subject - start_subject);
-            offsets[1] = (int)(ptr - start_subject);
+            offsets[0] = (PCRE2_SIZE)(current_subject - start_subject);
+            offsets[1] = (PCRE2_SIZE)(ptr - start_subject);
             }
           if ((mb->moptions & PCRE2_DFA_SHORTEST) != 0) RETURN_DFA(match_count);
           }
@@ -987,7 +989,7 @@ for (;;)
             {
             if (d == '_') left_word = TRUE; else
               {
-              int cat = UCD_CATEGORY(d);
+              uint32_t cat = UCD_CATEGORY(d);
               left_word = (cat == ucp_L || cat == ucp_N);
               }
             }
@@ -1012,7 +1014,7 @@ for (;;)
             {
             if (c == '_') right_word = TRUE; else
               {
-              int cat = UCD_CATEGORY(c);
+              uint32_t cat = UCD_CATEGORY(c);
               right_word = (cat == ucp_L || cat == ucp_N);
               }
             }
@@ -1397,7 +1399,7 @@ for (;;)
       if (count > 0) { ADD_ACTIVE(state_offset + 2, 0); }
       if (clen > 0)
         {
-        int lgb, rgb;
+        uint32_t lgb, rgb;
         PCRE2_SPTR nptr = ptr + clen;
         int ncount = 0;
         if (count > 0 && codevalue == OP_EXTUNI_EXTRA + OP_TYPEPOSPLUS)
@@ -1411,7 +1413,7 @@ for (;;)
           dlen = 1;
           if (!utf) d = *nptr; else { GETCHARLEN(d, nptr, dlen); }
           rgb = UCD_GRAPHBREAK(d);
-          if ((PRIV(ucp_gbtable)[lgb] & (1 << rgb)) == 0) break;
+          if ((PRIV(ucp_gbtable)[lgb] & (1u << rgb)) == 0) break;
           ncount++;
           lgb = rgb;
           nptr += dlen;
@@ -1658,7 +1660,7 @@ for (;;)
       ADD_ACTIVE(state_offset + 2, 0);
       if (clen > 0)
         {
-        int lgb, rgb;
+        uint32_t lgb, rgb;
         PCRE2_SPTR nptr = ptr + clen;
         int ncount = 0;
         if (codevalue == OP_EXTUNI_EXTRA + OP_TYPEPOSSTAR ||
@@ -1673,7 +1675,7 @@ for (;;)
           dlen = 1;
           if (!utf) d = *nptr; else { GETCHARLEN(d, nptr, dlen); }
           rgb = UCD_GRAPHBREAK(d);
-          if ((PRIV(ucp_gbtable)[lgb] & (1 << rgb)) == 0) break;
+          if ((PRIV(ucp_gbtable)[lgb] & (1u << rgb)) == 0) break;
           ncount++;
           lgb = rgb;
           nptr += dlen;
@@ -1930,7 +1932,7 @@ for (;;)
       count = current_state->count;  /* Number already matched */
       if (clen > 0)
         {
-        int lgb, rgb;
+        uint32_t lgb, rgb;
         PCRE2_SPTR nptr = ptr + clen;
         int ncount = 0;
         if (codevalue == OP_EXTUNI_EXTRA + OP_TYPEPOSUPTO)
@@ -1944,7 +1946,7 @@ for (;;)
           dlen = 1;
           if (!utf) d = *nptr; else { GETCHARLEN(d, nptr, dlen); }
           rgb = UCD_GRAPHBREAK(d);
-          if ((PRIV(ucp_gbtable)[lgb] & (1 << rgb)) == 0) break;
+          if ((PRIV(ucp_gbtable)[lgb] & (1u << rgb)) == 0) break;
           ncount++;
           lgb = rgb;
           nptr += dlen;
@@ -2125,7 +2127,7 @@ for (;;)
       case OP_EXTUNI:
       if (clen > 0)
         {
-        int lgb, rgb;
+        uint32_t lgb, rgb;
         PCRE2_SPTR nptr = ptr + clen;
         int ncount = 0;
         lgb = UCD_GRAPHBREAK(c);
@@ -2134,7 +2136,7 @@ for (;;)
           dlen = 1;
           if (!utf) d = *nptr; else { GETCHARLEN(d, nptr, dlen); }
           rgb = UCD_GRAPHBREAK(d);
-          if ((PRIV(ucp_gbtable)[lgb] & (1 << rgb)) == 0) break;
+          if ((PRIV(ucp_gbtable)[lgb] & (1u << rgb)) == 0) break;
           ncount++;
           lgb = rgb;
           nptr += dlen;
@@ -2612,7 +2614,7 @@ for (;;)
           mb,                                   /* static match data */
           code,                                 /* this subexpression's code */
           ptr,                                  /* where we currently are */
-          (int)(ptr - start_subject),           /* start offset */
+          (PCRE2_SIZE)(ptr - start_subject),    /* start offset */
           local_offsets,                        /* offset vector */
 #ifdef __KERNEL__
 		  2,
@@ -2641,8 +2643,8 @@ for (;;)
         PCRE2_SIZE local_offsets[1000];
         int local_workspace[1000];
 #endif
-        int codelink = GET(code, 1);
-        int condcode;
+        int codelink = (int)GET(code, 1);
+        PCRE2_UCHAR condcode;
 
         /* Because of the way auto-callout works during compile, a callout item
         is inserted between OP_COND and an assertion condition. This does not
@@ -2651,8 +2653,10 @@ for (;;)
         if (code[LINK_SIZE + 1] == OP_CALLOUT
             || code[LINK_SIZE + 1] == OP_CALLOUT_STR)
           {
-          unsigned int callout_length = (code[LINK_SIZE + 1] == OP_CALLOUT)
-              ? PRIV(OP_lengths)[OP_CALLOUT] : GET(code, 2 + 3*LINK_SIZE);
+          PCRE2_SIZE callout_length = (code[LINK_SIZE + 1] == OP_CALLOUT)?
+            (PCRE2_SIZE)PRIV(OP_lengths)[OP_CALLOUT] :
+            (PCRE2_SIZE)GET(code, 2 + 3*LINK_SIZE);
+
           rrc = 0;
           if (mb->callout != NULL)
             {
@@ -2718,7 +2722,7 @@ for (;;)
 
         else if (condcode == OP_RREF)
           {
-          int value = GET2(code, LINK_SIZE + 2);
+          unsigned int value = GET2(code, LINK_SIZE + 2);
           if (value != RREF_ANY) RETURN_DFA(PCRE2_ERROR_DFA_UCOND);
           if (mb->recursive != NULL)
             { ADD_ACTIVE(state_offset + LINK_SIZE + 2 + IMM2_SIZE, 0); }
@@ -2739,7 +2743,7 @@ for (;;)
             mb,                                   /* fixed match data */
             asscode,                              /* this subexpression's code */
             ptr,                                  /* where we currently are */
-            (int)(ptr - start_subject),           /* start offset */
+            (PCRE2_SIZE)(ptr - start_subject),    /* start offset */
             local_offsets,                        /* offset vector */
 #ifdef __KERNEL__
 			1000,
@@ -2797,7 +2801,7 @@ for (;;)
           mb,                                   /* fixed match data */
           callpat,                              /* this subexpression's code */
           ptr,                                  /* where we currently are */
-          (int)(ptr - start_subject),           /* start offset */
+          (PCRE2_SIZE)(ptr - start_subject),    /* start offset */
           local_offsets,                        /* offset vector */
 #ifdef __KERNEL__
 			1000,
@@ -2826,7 +2830,7 @@ for (;;)
           {
           for (rc = rc*2 - 2; rc >= 0; rc -= 2)
             {
-            int charcount = local_offsets[rc+1] - local_offsets[rc];
+            PCRE2_SIZE charcount = local_offsets[rc+1] - local_offsets[rc];
 #if defined SUPPORT_UNICODE && PCRE2_CODE_UNIT_WIDTH != 32
             if (utf)
               {
@@ -2837,7 +2841,8 @@ for (;;)
 #endif
             if (charcount > 0)
               {
-              ADD_NEW_DATA(-(state_offset + LINK_SIZE + 1), 0, (charcount - 1));
+              ADD_NEW_DATA(-(state_offset + LINK_SIZE + 1), 0,
+                (int)(charcount - 1));
               }
             else
               {
@@ -2856,7 +2861,7 @@ for (;;)
       case OP_SCBRAPOS:
       case OP_BRAPOSZERO:
         {
-        int charcount, matched_count;
+        PCRE2_SIZE charcount, matched_count;
         PCRE2_SPTR local_ptr = ptr;
         BOOL allow_zero;
 
@@ -2881,7 +2886,7 @@ for (;;)
             mb,                                   /* fixed match data */
             code,                                 /* this subexpression's code */
             local_ptr,                            /* where we currently are */
-            (int)(ptr - start_subject),           /* start offset */
+            (PCRE2_SIZE)(ptr - start_subject),    /* start offset */
             local_offsets,                        /* offset vector */
 #ifdef __KERNEL__
 			2,
@@ -2940,11 +2945,11 @@ for (;;)
             {
             PCRE2_SPTR p = ptr;
             PCRE2_SPTR pp = local_ptr;
-            charcount = (int)(pp - p);
+            charcount = (PCRE2_SIZE)(pp - p);
 #if defined SUPPORT_UNICODE && PCRE2_CODE_UNIT_WIDTH != 32
             if (utf) while (p < pp) if (NOT_FIRSTCU(*p++)) charcount--;
 #endif
-            ADD_NEW_DATA(-next_state_offset, 0, (charcount - 1));
+            ADD_NEW_DATA(-next_state_offset, 0, (int)(charcount - 1));
             }
           }
         }
@@ -2963,7 +2968,7 @@ for (;;)
           mb,                                   /* fixed match data */
           code,                                 /* this subexpression's code */
           ptr,                                  /* where we currently are */
-          (int)(ptr - start_subject),           /* start offset */
+          (PCRE2_SIZE)(ptr - start_subject),    /* start offset */
           local_offsets,                        /* offset vector */
 #ifdef __KERNEL__
 		  2,
@@ -2981,7 +2986,7 @@ for (;;)
         if (rc >= 0)
           {
           PCRE2_SPTR end_subpattern = code;
-          int charcount = local_offsets[1] - local_offsets[0];
+          PCRE2_SIZE charcount = local_offsets[1] - local_offsets[0];
           int next_state_offset, repeat_state_offset;
 
           do { end_subpattern += GET(end_subpattern, 1); }
@@ -3041,9 +3046,9 @@ for (;;)
               while (p < pp) if (NOT_FIRSTCU(*p++)) charcount--;
               }
 #endif
-            ADD_NEW_DATA(-next_state_offset, 0, (charcount - 1));
+            ADD_NEW_DATA(-next_state_offset, 0, (int)(charcount - 1));
             if (repeat_state_offset >= 0)
-              { ADD_NEW_DATA(-repeat_state_offset, 0, (charcount - 1)); }
+              { ADD_NEW_DATA(-repeat_state_offset, 0, (int)(charcount - 1)); }
             }
           }
         else if (rc != PCRE2_ERROR_NOMATCH) RETURN_DFA(rc);
@@ -3096,7 +3101,7 @@ for (;;)
             RETURN_DFA(rrc);   /* Abandon */
           }
         if (rrc == 0)
-          { ADD_ACTIVE(state_offset + callout_length, 0); }
+          { ADD_ACTIVE(state_offset + (int)callout_length, 0); }
         }
       break;
 
@@ -3385,10 +3390,10 @@ if (utf && (options & PCRE2_NO_UTF_CHECK) == 0)
   offset to be an absolute offset in the whole string. */
 
   match_data->rc = PRIV(valid_utf)(check_subject,
-    length - (check_subject - subject), &(match_data->startchar));
+    length - (PCRE2_SIZE)(check_subject - subject), &(match_data->startchar));
   if (match_data->rc != 0)
     {
-    match_data->startchar += check_subject - subject;
+    match_data->startchar += (PCRE2_SIZE)(check_subject - subject);
     return match_data->rc;
     }
   }
@@ -3410,7 +3415,8 @@ if (!anchored)
       {
       first_cu2 = TABLE_GET(first_cu, mb->tables + fcc_offset, first_cu);
 #if defined SUPPORT_UNICODE && PCRE2_CODE_UNIT_WIDTH != 8
-      if (utf && first_cu > 127) first_cu2 = UCD_OTHERCASE(first_cu);
+      if (utf && first_cu > 127)
+        first_cu2 = (PCRE2_UCHAR)UCD_OTHERCASE(first_cu);
 #endif
       }
     }
@@ -3430,7 +3436,7 @@ if ((re->flags & PCRE2_LASTSET) != 0)
     {
     req_cu2 = TABLE_GET(req_cu, mb->tables + fcc_offset, req_cu);
 #if defined SUPPORT_UNICODE && PCRE2_CODE_UNIT_WIDTH != 8
-    if (utf && req_cu > 127) req_cu2 = UCD_OTHERCASE(req_cu);
+    if (utf && req_cu > 127) req_cu2 = (PCRE2_UCHAR)UCD_OTHERCASE(req_cu);
 #endif
     }
   }
@@ -3638,9 +3644,9 @@ for (;;)
     start_match,                  /* where we currently are */
     start_offset,                 /* start offset in subject */
     match_data->ovector,          /* offset vector */
-    match_data->oveccount * 2,    /* actual size of same */
+    (uint32_t)match_data->oveccount * 2,  /* actual size of same */
     workspace,                    /* workspace vector */
-    wscount,                      /* size of same */
+    (int)wscount,                 /* size of same */
     0);                           /* function recurse level */
 
   /* Anything other than "no match" means we are done, always; otherwise, carry
@@ -3654,7 +3660,7 @@ for (;;)
       match_data->ovector[1] = (PCRE2_SIZE)(end_subject - subject);
       }
     match_data->leftchar = (PCRE2_SIZE)(mb->start_used_ptr - subject);
-    match_data->rightchar = mb->last_used_ptr - subject;
+    match_data->rightchar = (PCRE2_SIZE)( mb->last_used_ptr - subject);
     match_data->startchar = (PCRE2_SIZE)(start_match - subject);
     match_data->rc = rc;
     return rc;
