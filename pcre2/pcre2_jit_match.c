@@ -51,12 +51,12 @@ static SLJIT_NOINLINE int jit_machine_stack_exec(jit_arguments *arguments, jit_f
 {
 struct sljit_stack local_stack;
 int r;
-sljit_ub *local_space = kmem_cache_alloc(local_space_cache, GFP_ATOMIC);
+sljit_u8 *local_space = kmem_cache_alloc(local_space_cache, GFP_ATOMIC);
 
 if (unlikely(local_space == NULL))
     panic("%s: Out of memory", __func__);
 
-local_stack.top = (sljit_sw)&local_space;
+local_stack.top = (sljit_sw)local_space;
 local_stack.base = local_stack.top;
 local_stack.limit = local_stack.base + MACHINE_STACK_SIZE;
 local_stack.max_limit = local_stack.limit;
@@ -68,7 +68,7 @@ return r;
 #else
 static SLJIT_NOINLINE int jit_machine_stack_exec(jit_arguments *arguments, jit_function executable_func)
 {
-sljit_ub local_space[MACHINE_STACK_SIZE];
+sljit_u8 local_space[MACHINE_STACK_SIZE];
 struct sljit_stack local_stack;
 
 local_stack.top = (sljit_sw)&local_space;
