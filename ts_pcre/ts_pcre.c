@@ -44,7 +44,7 @@ MODULE_DESCRIPTION("PCRE text search engine");
 
 static pcre2_code *parse_regex;
 
-static bool jit_enable __read_mostly = true;
+static bool jit_enable __read_mostly = false;
 module_param_named(jit, jit_enable, bool, 0444);
 MODULE_PARM_DESC(jit, " enable JIT(just in time) compilation.");
 
@@ -371,17 +371,15 @@ static int __init ts_pcre_init(void)
 		goto err_compile;
 
     for_each_online_cpu(i) {
-		pcre2_match_data *_match_data = per_cpu(match_data, i);
-		pcre2_match_context *_mcontext = per_cpu(match_context, i);
-		pcre2_jit_stack *_jit_stack = per_cpu(jit_stack, i);
 
-		_match_data = pcre2_match_data_create(1, NULL);
-		_mcontext = pcre2_match_context_create(NULL);
-		_jit_stack = pcre2_jit_stack_create( \
+		per_cpu(match_data, i) = pcre2_match_data_create(1, NULL);
+		per_cpu(match_context, i) = pcre2_match_context_create(NULL);
+		per_cpu(jit_stack, i) = pcre2_jit_stack_create( \
 			jit_stack_start, jit_stack_max, NULL);
 
-//		pcre2_jit_stack_assign(_mcontext, NULL, _jit_stack);
-		pcre2_jit_stack_assign(_mcontext, NULL, NULL);
+		pcre2_jit_stack_assign(per_cpu(match_context, i), \
+				NULL, per_cpu(jit_stack, i));
+//		pcre2_jit_stack_assign(per_cpu(match_context, i), NULL, NULL);
     }   
 
 	return textsearch_register(&pcre_ops);
