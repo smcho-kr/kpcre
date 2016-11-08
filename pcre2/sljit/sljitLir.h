@@ -1146,6 +1146,7 @@ struct sljit_stack {
    Note: see sljit_create_compiler for the explanation of allocator_data. */
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_stack* SLJIT_CALL sljit_allocate_stack(sljit_uw limit, sljit_uw max_limit, void *allocator_data);
 SLJIT_API_FUNC_ATTRIBUTE void SLJIT_CALL sljit_free_stack(struct sljit_stack *stack, void *allocator_data);
+SLJIT_API_FUNC_ATTRIBUTE void SLJIT_CALL sljit_reset_stack(struct sljit_stack *stack, sljit_uw limit, sljit_uw max_limit);
 
 /* Can be used to increase (allocate) or decrease (free) the memory area.
    Returns with a non-zero value if unsuccessful. If new_limit is greater than

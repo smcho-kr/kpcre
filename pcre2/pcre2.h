@@ -548,7 +548,8 @@ PCRE2_EXP_DECL \
                            pcre2_general_context *); \
 PCRE2_EXP_DECL void      pcre2_jit_stack_assign(pcre2_match_context *, \
                            pcre2_jit_callback, void *); \
-PCRE2_EXP_DECL void      pcre2_jit_stack_free(pcre2_jit_stack *);
+PCRE2_EXP_DECL void      pcre2_jit_stack_free(pcre2_jit_stack *); \
+PCRE2_EXP_DECL void      pcre2_jit_stack_reset(pcre2_jit_stack *, PCRE2_SIZE, PCRE2_SIZE);
 
 
 /* Other miscellaneous functions. */
@@ -623,6 +624,7 @@ pcre2_compile are called by application code. */
 #define pcre2_jit_stack_assign                PCRE2_SUFFIX(pcre2_jit_stack_assign_)
 #define pcre2_jit_stack_create                PCRE2_SUFFIX(pcre2_jit_stack_create_)
 #define pcre2_jit_stack_free                  PCRE2_SUFFIX(pcre2_jit_stack_free_)
+#define pcre2_jit_stack_reset                 PCRE2_SUFFIX(pcre2_jit_stack_reset_)
 #define pcre2_maketables                      PCRE2_SUFFIX(pcre2_maketables_)
 #define pcre2_match                           PCRE2_SUFFIX(pcre2_match_)
 #define pcre2_match_context_copy              PCRE2_SUFFIX(pcre2_match_context_copy_)

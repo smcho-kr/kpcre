@@ -203,6 +203,32 @@ if (jit_stack != NULL)
 EXPORT_SYMBOL(pcre2_jit_stack_free);
 #endif
 
+/*************************************************
+*               Reset a JIT stack                *
+*************************************************/
+
+PCRE2_EXP_DEFN void PCRE2_CALL_CONVENTION
+pcre2_jit_stack_reset(pcre2_jit_stack *jit_stack, size_t startsize, size_t maxsize)
+{
+#ifndef SUPPORT_JIT
+(void)jit_stack;
+#else  /* SUPPORT_JIT */
+if (startsize < 1 || maxsize < 1)
+  return;
+if (startsize > maxsize)
+  startsize = maxsize;
+startsize = (startsize + STACK_GROWTH_RATE - 1) & ~(STACK_GROWTH_RATE - 1);
+maxsize = (maxsize + STACK_GROWTH_RATE - 1) & ~(STACK_GROWTH_RATE - 1);
+if (jit_stack != NULL)
+  {
+  sljit_reset_stack((struct sljit_stack *)(jit_stack->stack), startsize, maxsize);
+  }
+#endif  /* SUPPORT_JIT */
+}
+#ifdef __KERNEL__
+EXPORT_SYMBOL(pcre2_jit_stack_reset);
+#endif
+
 
 /*************************************************
 *               Get target CPU type              *

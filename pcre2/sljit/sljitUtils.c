@@ -348,6 +348,13 @@ SLJIT_API_FUNC_ATTRIBUTE void SLJIT_CALL sljit_free_stack(struct sljit_stack* st
 	SLJIT_FREE(stack, allocator_data);
 }
 
+SLJIT_API_FUNC_ATTRIBUTE void SLJIT_CALL sljit_reset_stack(struct sljit_stack* stack, sljit_uw limit, sljit_uw max_limit)
+{
+	memset((void*)stack->base, 0, max_limit);
+	stack->limit = stack->base + limit;
+	stack->max_limit = stack->base + max_limit;
+}
+
 SLJIT_API_FUNC_ATTRIBUTE sljit_sw SLJIT_CALL sljit_stack_resize(struct sljit_stack* stack, sljit_uw new_limit)
 {
 	sljit_uw aligned_old_limit;
