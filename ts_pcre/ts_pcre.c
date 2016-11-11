@@ -53,7 +53,7 @@ static unsigned int jit_stack_start __read_mostly = 1; /* bytes */
 module_param_named(start, jit_stack_start, uint, 0444);
 MODULE_PARM_DESC(start, " set a starting size of the JIT stack.");
 
-static unsigned int jit_stack_max __read_mostly = 256 * 1024; /* bytes */
+static unsigned int jit_stack_max __read_mostly = 512 * 1024; /* bytes */
 module_param_named(max, jit_stack_max, uint, 0444);
 MODULE_PARM_DESC(max, " set a maximum size to which the JIT stack is allowed to grow.");
 
@@ -69,39 +69,26 @@ struct ts_pcre {
 static DEFINE_PER_CPU(pcre2_match_data *, match_data);
 static DEFINE_PER_CPU(pcre2_match_context *, match_context);
 static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
+static DEFINE_PER_CPU(u32, counter);
 
-#ifdef XXXXXXXXXX
+#define RESET_COUNT		(2)
+
 static pcre2_jit_stack *callback(void *arg)
 {
-    return arg;
+	u32 t;
+	pcre2_jit_stack *_jit_stack = get_cpu_var(jit_stack);
+
+	(void)arg;
+	t = get_cpu_var(counter)++;
+	put_cpu_var(counter);
+
+	if (!(t%RESET_COUNT)) {
+        pcre2_jit_stack_reset(_jit_stack, jit_stack_start, jit_stack_max);
+	}
+
+	put_cpu_var(jit_stack);
+	return _jit_stack;
 }
-
-static pcre2_jit_stack *getstack(void)
-{
-    pcre2_jit_stack **_jit_stack = &get_cpu_var(jit_stack);
-
-    if (!(*_jit_stack))
-        *_jit_stack = \
-              pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
-    put_cpu_var(jit_stack);
-
-    return *_jit_stack;
-}
-
-static void setstack(pcre2_match_context *mcontext)
-{
-    pcre2_jit_stack **_jit_stack = &get_cpu_var(jit_stack);
-	pcre2_match_context *_match_context = get_cpu_var(match_context);
-
-    if (!mcontext) {
-        if (!(*_jit_stack))
-              pcre2_jit_stack_free(*_jit_stack);
-    }
-    pcre2_jit_stack_assign(_match_context, callback, getstack());
-    put_cpu_var(jit_stack);
-    put_cpu_var(match_context);
-}
-#endif
 
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
@@ -111,16 +98,8 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 	unsigned int match, text_len, consumed = state->offset;
 	int rc;
 
-//	pcre2_match_data *_match_data = pcre2_match_data_create(OVECTOR_SIZE, NULL);
-//	pcre2_match_context *_match_context = pcre2_match_context_create(NULL);
-//	pcre2_jit_stack *_jit_stack = pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
-
 	pcre2_match_data *_match_data = get_cpu_var(match_data);
 	pcre2_match_context *_match_context = get_cpu_var(match_context);
-	pcre2_jit_stack *_jit_stack = get_cpu_var(jit_stack);
-
-//	pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
-	pcre2_jit_stack_reset(_jit_stack, jit_stack_start, jit_stack_max);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
@@ -168,25 +147,13 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 //		state->offset = consumed;
 	}
 
-//	pcre2_match_data_free(_match_data);
-//	pcre2_match_context_free(_match_context);
-//	pcre2_jit_stack_free(_jit_stack);
-
-	put_cpu_var(match_data);
 	put_cpu_var(match_context);
-	put_cpu_var(jit_stack);
-
+	put_cpu_var(match_data);
 	return UINT_MAX;
 
 found:
-//	pcre2_match_data_free(_match_data);
-//	pcre2_match_context_free(_match_context);
-//	pcre2_jit_stack_free(_jit_stack);
-
-	put_cpu_var(match_data);
 	put_cpu_var(match_context);
-	put_cpu_var(jit_stack);
-
+	put_cpu_var(match_data);
 	return match;
 }
 
@@ -432,11 +399,12 @@ static int __init ts_pcre_init(void)
 
 		pcre2_jit_stack *_jit_stack = pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
 
-		pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
+		pcre2_jit_stack_assign(_match_context, callback, NULL);
 
 		per_cpu(match_data, i) = _match_data;
 		per_cpu(match_context, i) = _match_context;
 		per_cpu(jit_stack, i) = _jit_stack;
+		per_cpu(counter, i) = 0;
 
     }   
 
