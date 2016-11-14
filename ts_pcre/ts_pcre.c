@@ -69,26 +69,6 @@ struct ts_pcre {
 static DEFINE_PER_CPU(pcre2_match_data *, match_data);
 static DEFINE_PER_CPU(pcre2_match_context *, match_context);
 static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
-static DEFINE_PER_CPU(u32, counter);
-
-#define RESET_COUNT		(2)
-
-static pcre2_jit_stack *callback(void *arg)
-{
-	u32 t;
-	pcre2_jit_stack *_jit_stack = get_cpu_var(jit_stack);
-
-	(void)arg;
-	t = get_cpu_var(counter)++;
-	put_cpu_var(counter);
-
-	if (!(t%RESET_COUNT)) {
-        pcre2_jit_stack_reset(_jit_stack, jit_stack_start, jit_stack_max);
-	}
-
-	put_cpu_var(jit_stack);
-	return _jit_stack;
-}
 
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
@@ -96,10 +76,11 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 	struct ts_pcre *pcre = ts_config_priv(conf);
 	const u8 *text;
 	unsigned int match, text_len, consumed = state->offset;
+	int cpu = smp_processor_id();
 	int rc;
 
-	pcre2_match_data *_match_data = get_cpu_var(match_data);
-	pcre2_match_context *_match_context = get_cpu_var(match_context);
+	pcre2_match_data *_match_data = per_cpu(match_data, cpu);
+	pcre2_match_context *_match_context = per_cpu(match_context, cpu);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
@@ -147,13 +128,9 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 //		state->offset = consumed;
 	}
 
-	put_cpu_var(match_context);
-	put_cpu_var(match_data);
 	return UINT_MAX;
 
 found:
-	put_cpu_var(match_context);
-	put_cpu_var(match_data);
 	return match;
 }
 
@@ -399,12 +376,11 @@ static int __init ts_pcre_init(void)
 
 		pcre2_jit_stack *_jit_stack = pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
 
-		pcre2_jit_stack_assign(_match_context, callback, NULL);
+		pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
 
 		per_cpu(match_data, i) = _match_data;
 		per_cpu(match_context, i) = _match_context;
 		per_cpu(jit_stack, i) = _jit_stack;
-		per_cpu(counter, i) = 0;
 
     }   
 

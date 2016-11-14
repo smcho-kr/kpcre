@@ -42,7 +42,7 @@ EXPORT_SYMBOL(realloc);
 
 void *calloc(size_t nmemb, size_t size)
 {
-	return kzalloc(nmemb * size, GFP_ATOMIC);
+	return kcalloc(nmemb, size, GFP_ATOMIC);
 }
 
 EXPORT_SYMBOL(calloc);
