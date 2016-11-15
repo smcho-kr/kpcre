@@ -46,6 +46,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef __KERNEL__
 #include <linux/slab.h>
+#include <asm/fpu/api.h>
 extern struct kmem_cache *local_space_cache;
 static SLJIT_NOINLINE int jit_machine_stack_exec(jit_arguments *arguments, jit_function executable_func)
 {
@@ -185,6 +186,11 @@ arguments.oveccount = oveccount << 1;
 
 
 convert_executable_func.executable_func = functions->executable_funcs[index];
+
+#ifdef __KERNEL__
+kernel_fpu_begin();
+#endif
+
 if (jit_stack != NULL)
   {
   arguments.stack = (struct sljit_stack *)(jit_stack->stack);
@@ -192,6 +198,10 @@ if (jit_stack != NULL)
   }
 else
   rc = jit_machine_stack_exec(&arguments, convert_executable_func.call_executable_func);
+
+#ifdef __KERNEL__
+kernel_fpu_end();
+#endif
 
 if (rc > (int)oveccount)
   rc = 0;
