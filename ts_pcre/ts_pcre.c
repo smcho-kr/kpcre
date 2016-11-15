@@ -31,6 +31,7 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/stddef.h>
+#include <linux/interrupt.h>
 #include <linux/textsearch.h>
 
 #include "libc.h"
@@ -70,17 +71,26 @@ static DEFINE_PER_CPU(pcre2_match_data *, match_data);
 static DEFINE_PER_CPU(pcre2_match_context *, match_context);
 static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
 
+
+pcre2_jit_stack *callback(void *arg)
+{
+	return *this_cpu_ptr(&jit_stack);
+}
+
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
+	pcre2_match_data *_match_data;
+	pcre2_match_context *_match_context;
 	PCRE2_SIZE *ovector;
-	struct ts_pcre *pcre = ts_config_priv(conf);
+	struct ts_pcre *pcre;
 	const u8 *text;
-	unsigned int match, text_len, consumed = state->offset;
-	int cpu = smp_processor_id();
+	unsigned int match, text_len, consumed;
 	int rc;
 
-	pcre2_match_data *_match_data = per_cpu(match_data, cpu);
-	pcre2_match_context *_match_context = per_cpu(match_context, cpu);
+	pcre = ts_config_priv(conf);
+	consumed = state->offset;
+	_match_data = *this_cpu_ptr(&match_data);
+	_match_context = *this_cpu_ptr(&match_context);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
@@ -128,9 +138,11 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 //		state->offset = consumed;
 	}
 
+//	preempt_enable();
 	return UINT_MAX;
 
 found:
+//	preempt_enable();
 	return match;
 }
 
@@ -376,7 +388,9 @@ static int __init ts_pcre_init(void)
 
 		pcre2_jit_stack *_jit_stack = pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
 
-		pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
+//		pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
+		pcre2_jit_stack_assign(_match_context, callback, NULL);
+//		pcre2_jit_stack_assign(_match_context, NULL, NULL);
 
 		per_cpu(match_data, i) = _match_data;
 		per_cpu(match_context, i) = _match_context;
