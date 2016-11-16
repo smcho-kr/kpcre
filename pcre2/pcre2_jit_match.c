@@ -48,7 +48,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <linux/version.h>
 #include <linux/slab.h>
 
-#if defined(__i386__) || defined(__i386)
+#if defined(SLJIT_CONFIG_X86_32) || defined(SLJIT_CONFIG_X86_64)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #include <asm/fpu/api.h>
@@ -198,7 +198,7 @@ arguments.oveccount = oveccount << 1;
 convert_executable_func.executable_func = functions->executable_funcs[index];
 
 #ifdef __KERNEL__
-#if defined(__i386__) || defined(__i386)
+#if defined(SLJIT_CONFIG_X86_32) || defined(SLJIT_CONFIG_X86_64)
 kernel_fpu_begin();
 #endif
 #endif
@@ -212,7 +212,7 @@ else
   rc = jit_machine_stack_exec(&arguments, convert_executable_func.call_executable_func);
 
 #ifdef __KERNEL__
-#if defined(__i386__) || defined(__i386)
+#if defined(SLJIT_CONFIG_X86_32) || defined(SLJIT_CONFIG_X86_64)
 kernel_fpu_end();
 #endif
 #endif
