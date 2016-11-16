@@ -31,6 +31,7 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/stddef.h>
+#include <linux/interrupt.h>
 #include <linux/textsearch.h>
 
 #include "libc.h"
@@ -41,10 +42,11 @@ MODULE_AUTHOR("Seongmyun Cho <highsky@gmail.com>");
 MODULE_DESCRIPTION("PCRE text search engine");
 
 #define PARSE_REGEX         "(?<!\\\\)/(.*(?<!(?<!\\\\)\\\\))/([^\"]*)"
+#define OVECTOR_SIZE 4
 
 static pcre2_code *parse_regex;
 
-static bool jit_enable __read_mostly = false;
+static bool jit_enable __read_mostly = true;
 module_param_named(jit, jit_enable, bool, 0444);
 MODULE_PARM_DESC(jit, " enable JIT(just in time) compilation.");
 
@@ -52,7 +54,7 @@ static unsigned int jit_stack_start __read_mostly = 1; /* bytes */
 module_param_named(start, jit_stack_start, uint, 0444);
 MODULE_PARM_DESC(start, " set a starting size of the JIT stack.");
 
-static unsigned int jit_stack_max __read_mostly = 1024 * 1024; /* bytes */
+static unsigned int jit_stack_max __read_mostly = 512 * 1024; /* bytes */
 module_param_named(max, jit_stack_max, uint, 0444);
 MODULE_PARM_DESC(max, " set a maximum size to which the JIT stack is allowed to grow.");
 
@@ -71,13 +73,18 @@ static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
 
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
+	pcre2_match_data *_match_data;
+	pcre2_match_context *_match_context;
 	PCRE2_SIZE *ovector;
-	struct ts_pcre *pcre = ts_config_priv(conf);
+	struct ts_pcre *pcre;
 	const u8 *text;
-	unsigned int match, text_len, consumed = state->offset;
-	pcre2_match_data *_match_data = get_cpu_var(match_data);
-	pcre2_match_context *_mcontext = get_cpu_var(match_context);
+	unsigned int match, text_len, consumed;
 	int rc;
+
+	pcre = ts_config_priv(conf);
+	consumed = state->offset;
+	_match_data = *this_cpu_ptr(&match_data);
+	_match_context = *this_cpu_ptr(&match_context);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
@@ -86,7 +93,7 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 			break;
 
 		rc = pcre2_match(pcre->re, text, text_len, 0, 0,
-				 _match_data, _mcontext);
+				 _match_data, _match_context);
 
 		if (unlikely(rc >= 0)) {
 #ifdef DEBUG
@@ -125,13 +132,9 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 //		state->offset = consumed;
 	}
 
-	put_cpu_var(match_data);
-	put_cpu_var(match_context);
 	return UINT_MAX;
 
 found:
-	put_cpu_var(match_data);
-	put_cpu_var(match_context);
 	return match;
 }
 
@@ -372,14 +375,17 @@ static int __init ts_pcre_init(void)
 
     for_each_online_cpu(i) {
 
-		per_cpu(match_data, i) = pcre2_match_data_create(1, NULL);
-		per_cpu(match_context, i) = pcre2_match_context_create(NULL);
-		per_cpu(jit_stack, i) = pcre2_jit_stack_create( \
-			jit_stack_start, jit_stack_max, NULL);
+		pcre2_match_data *_match_data = pcre2_match_data_create(OVECTOR_SIZE, NULL);
+		pcre2_match_context *_match_context = pcre2_match_context_create(NULL);
 
-		pcre2_jit_stack_assign(per_cpu(match_context, i), \
-				NULL, per_cpu(jit_stack, i));
-//		pcre2_jit_stack_assign(per_cpu(match_context, i), NULL, NULL);
+		pcre2_jit_stack *_jit_stack = pcre2_jit_stack_create(jit_stack_start, jit_stack_max, NULL);
+
+		pcre2_jit_stack_assign(_match_context, NULL, _jit_stack);
+
+		per_cpu(match_data, i) = _match_data;
+		per_cpu(match_context, i) = _match_context;
+		per_cpu(jit_stack, i) = _jit_stack;
+
     }   
 
 	return textsearch_register(&pcre_ops);
@@ -395,11 +401,11 @@ static void __exit ts_pcre_exit(void)
 
     for_each_online_cpu(i) {
 		pcre2_match_data *_match_data = per_cpu(match_data, i);
-		pcre2_match_context *_mcontext = per_cpu(match_context, i);
+		pcre2_match_context *_match_context = per_cpu(match_context, i);
 		pcre2_jit_stack *_jit_stack = per_cpu(jit_stack, i);
 
 		pcre2_match_data_free(_match_data);
-		pcre2_match_context_free(_mcontext);
+		pcre2_match_context_free(_match_context);
 		pcre2_jit_stack_free(_jit_stack);
     }   
 

@@ -2305,7 +2305,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_is_fpu_available(void)
 		get_cpu_features();
 	return cpu_has_sse2;
 #else /* SLJIT_DETECT_SSE2 */
-	return 1;
+	return 0;
 #endif /* SLJIT_DETECT_SSE2 */
 }
 

@@ -203,7 +203,6 @@ if (jit_stack != NULL)
 EXPORT_SYMBOL(pcre2_jit_stack_free);
 #endif
 
-
 /*************************************************
 *               Get target CPU type              *
 *************************************************/

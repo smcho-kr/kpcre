@@ -548,7 +548,7 @@ PCRE2_EXP_DECL \
                            pcre2_general_context *); \
 PCRE2_EXP_DECL void      pcre2_jit_stack_assign(pcre2_match_context *, \
                            pcre2_jit_callback, void *); \
-PCRE2_EXP_DECL void      pcre2_jit_stack_free(pcre2_jit_stack *);
+PCRE2_EXP_DECL void      pcre2_jit_stack_free(pcre2_jit_stack *); \
 
 
 /* Other miscellaneous functions. */

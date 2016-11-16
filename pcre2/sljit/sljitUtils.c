@@ -300,7 +300,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_stack* SLJIT_CALL sljit_allocate_stack(slj
 		return NULL;
 	}
 #elif defined(__KERNEL__)
-	base.ptr = calloc(1, max_limit);
+	base.ptr = malloc(max_limit);
 
 	if (base.ptr == NULL) {
 		SLJIT_FREE(stack, allocator_data);
