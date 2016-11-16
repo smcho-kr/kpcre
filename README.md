@@ -1,4 +1,4 @@
-# PCRE linux kernel module &amp; PCRE/REGEX based text search engine
+# PCRE linux kernel module &amp; PCRE/REGEX text search engine
 
 Keywords: Netfilter iptables PCRE REGEX Linux Kernel Module
 
@@ -12,7 +12,7 @@ It is a full-fledged PCRE kernel module which supports JIT(Just-in-time) compila
 
 Original sources: ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre
 
-### PCRE based text search engine (ts_pcre.ko)
+### PCRE text search engine (ts_pcre.ko)
 
 This is a new text search engine based on the PCRE kernel module.
 
