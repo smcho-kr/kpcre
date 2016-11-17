@@ -1,0 +1,71 @@
+When you use PCRE text search module with iptables on x86 Linux platfrom, the following kernel warning message could appear.
+
+The warning message should be ignored because it is the result of the intended operation.
+
+Because the x86 JIT code uses SSE2 instructions inside the kernel, kernel_fpu_begin()/kernel_fpu_end() must be called, which is not an usual thing for kernel modules.
+
+The kernel prints the message when it happens to call "kernel_fpu_begin()" in softirq context.
+
+[62016.403553] ------------[ cut here ]------------
+[62016.403568] WARNING: at /usr/src/kernels/3.10.0-327.36.3.el7.x86_64/arch/x86/include/asm/i387.h:43 pcre2_jit_match_8+0x248/0x260 [libpcre2_8]()
+[62016.403570] Modules linked in: ts_pcre(OE) libpcre2_8(OE) libc(OE) xt_string xt_CHECKSUM iptable_mangle ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat nf_nat_ipv4 nf_nat nf_conntrack_ipv4 nf_defrag_ipv4 xt_conntrack nf_conntrack ipt_REJECT tun bridge stp llc ebtable_filter ebtables ip6table_filter ip6_tables iptable_filter coretemp iTCO_wdt ppdev iTCO_vendor_support kvm_intel lpc_ich pcspkr i2c_i801 kvm mfd_core sg parport_pc parport i7core_edac edac_core ioatdma shpchp acpi_cpufreq nfsd auth_rpcgss nfs_acl lockd grace sunrpc ip_tables xfs libcrc32c sd_mod crc_t10dif crct10dif_generic crct10dif_common ata_generic pata_acpi crc32c_intel ata_piix serio_raw libata igb ptp pps_core i2c_algo_bit i2c_core dca dm_mirror dm_region_hash dm_log dm_mod [last unloaded: libc]
+[62016.403624] CPU: 0 PID: 1307 Comm: redis-server Tainted: G        W  OE  ------------   3.10.0-327.36.3.el7.x86_64 #1
+[62016.403626] Hardware name: Intel Thurley/Greencity, BIOS 080015  07/09/2010
+[62016.403628]  0000000000000000 000000005b43eac9 ffff8801b9a034b8 ffffffff81636431
+[62016.403632]  ffff8801b9a034f0 ffffffff8107b260 ffff8800363edd6a ffff8800b633d080
+[62016.403635]  0000000000000001 ffff880335e387e0 ffff88032c4778c0 ffff8801b9a03500
+[62016.403638] Call Trace:
+[62016.403639]  <IRQ>  [<ffffffff81636431>] dump_stack+0x19/0x1b
+[62016.403652]  [<ffffffff8107b260>] warn_slowpath_common+0x70/0xb0
+[62016.403655]  [<ffffffff8107b3aa>] warn_slowpath_null+0x1a/0x20
+[62016.403660]  [<ffffffffa04c8028>] pcre2_jit_match_8+0x248/0x260 [libpcre2_8]
+[62016.403667]  [<ffffffffa050826f>] pcre2_match_8+0x45f/0x12b0 [libpcre2_8]
+[62016.403672]  [<ffffffffa050826f>] ? pcre2_match_8+0x45f/0x12b0 [libpcre2_8]
+[62016.403677]  [<ffffffff8130c6dd>] ? list_del+0xd/0x30
+[62016.403682]  [<ffffffff81189b89>] ? zone_statistics+0x89/0xa0
+[62016.403687]  [<ffffffff813da9f0>] ? add_interrupt_randomness+0x50/0x1b0
+[62016.403693]  [<ffffffff81173327>] ? __alloc_pages_nodemask+0x197/0xba0
+[62016.403697]  [<ffffffff810df08f>] ? tick_broadcast_set_event+0x3f/0xc0
+[62016.403700]  [<ffffffff813da9f0>] ? add_interrupt_randomness+0x50/0x1b0
+[62016.403704]  [<ffffffffa0030000>] ? 0xffffffffa002ffff
+[62016.403708]  [<ffffffff8130c6dd>] ? list_del+0xd/0x30
+[62016.403711]  [<ffffffffa054311c>] pcre_find+0x7c/0x110 [ts_pcre]
+[62016.403716]  [<ffffffff81518277>] skb_find_text+0x67/0xa0
+[62016.403720]  [<ffffffffa04a712e>] string_mt+0x6e/0xa8 [xt_string]
+[62016.403725]  [<ffffffffa0037c32>] ipt_do_table+0x262/0x710 [ip_tables]
+[62016.403729]  [<ffffffffa04820d2>] ? nf_nat_setup_info+0x92/0x350 [nf_nat]
+[62016.403734]  [<ffffffffa008b036>] iptable_filter_hook+0x36/0x80 [iptable_filter]
+[62016.403739]  [<ffffffff8155cf50>] nf_iterate+0x70/0xb0
+[62016.403742]  [<ffffffff8155d038>] nf_hook_slow+0xa8/0x110
+[62016.403745]  [<ffffffff81566b72>] ip_local_deliver+0xb2/0xd0
+[62016.403748]  [<ffffffff81566780>] ? ip_rcv_finish+0x350/0x350
+[62016.403750]  [<ffffffff815664ad>] ip_rcv_finish+0x7d/0x350
+[62016.403753]  [<ffffffff81566e46>] ip_rcv+0x2b6/0x410
+[62016.403755]  [<ffffffff81566430>] ? inet_del_offload+0x40/0x40
+[62016.403760]  [<ffffffff8152aed2>] __netif_receive_skb_core+0x582/0x7d0
+[62016.403765]  [<ffffffff8101c859>] ? read_tsc+0x9/0x10
+[62016.403767]  [<ffffffff8152b138>] __netif_receive_skb+0x18/0x60
+[62016.403770]  [<ffffffff8152b1c0>] netif_receive_skb+0x40/0xc0
+[62016.403773]  [<ffffffff8152bd30>] napi_gro_receive+0x80/0xb0
+[62016.403781]  [<ffffffffa010dc24>] igb_clean_rx_irq+0x384/0x7a0 [igb]
+[62016.403786]  [<ffffffff810c3627>] ? enqueue_entity+0x237/0x8b0
+[62016.403793]  [<ffffffffa010e3bf>] igb_poll+0x37f/0x770 [igb]
+[62016.403797]  [<ffffffff810bb7c5>] ? sched_clock_cpu+0x85/0xc0
+[62016.403800]  [<ffffffff8152b5f2>] net_rx_action+0x152/0x240
+[62016.403804]  [<ffffffff81084baf>] __do_softirq+0xef/0x280
+[62016.403807]  [<ffffffff8164845c>] call_softirq+0x1c/0x30
+[62016.403811]  [<ffffffff81016fc5>] do_softirq+0x65/0xa0
+[62016.403813]  [<ffffffff81084f45>] irq_exit+0x115/0x120
+[62016.403816]  [<ffffffff81648ff8>] do_IRQ+0x58/0xf0
+[62016.403819]  [<ffffffff8163e32d>] common_interrupt+0x6d/0x6d
+[62016.403821]  <EOI>  [<ffffffff811ec590>] ? do_last+0x6d0/0x1270
+[62016.403826]  [<ffffffff811ec32f>] ? do_last+0x46f/0x1270
+[62016.403829]  [<ffffffff811eee12>] path_openat+0xc2/0x490
+[62016.403832]  [<ffffffff8163ac5e>] ? schedule_hrtimeout_range_clock+0xbe/0x150
+[62016.403836]  [<ffffffff810a9650>] ? hrtimer_get_res+0x50/0x50
+[62016.403839]  [<ffffffff811f05db>] do_filp_open+0x4b/0xb0
+[62016.403842]  [<ffffffff811fd177>] ? __alloc_fd+0xa7/0x130
+[62016.403845]  [<ffffffff811ddf83>] do_sys_open+0xf3/0x1f0
+[62016.403848]  [<ffffffff811de09e>] SyS_open+0x1e/0x20
+[62016.403851]  [<ffffffff81646b49>] system_call_fastpath+0x16/0x1b
+[62016.403853] ---[ end trace af4b90c5524e6519 ]---
