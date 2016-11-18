@@ -71,6 +71,10 @@ static DEFINE_PER_CPU(pcre2_match_data *, match_data);
 static DEFINE_PER_CPU(pcre2_match_context *, match_context);
 static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
 
+#ifndef __get_cpu_var
+#define __get_cpu_var(var)	*this_cpu_ptr(&(var))
+#endif
+
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 {
 	pcre2_match_data *_match_data;
@@ -83,8 +87,8 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 
 	pcre = ts_config_priv(conf);
 	consumed = state->offset;
-	_match_data = *this_cpu_ptr(&match_data);
-	_match_context = *this_cpu_ptr(&match_context);
+	_match_data = __get_cpu_var(match_data);
+	_match_context = __get_cpu_var(match_context);
 
 	for (;;) {
 		text_len = conf->get_next_block(consumed, &text, conf, state);
