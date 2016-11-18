@@ -87,6 +87,9 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 
 	pcre = ts_config_priv(conf);
 	consumed = state->offset;
+
+	preempt_disable();
+
 	_match_data = __get_cpu_var(match_data);
 	_match_context = __get_cpu_var(match_context);
 
@@ -136,9 +139,10 @@ static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
 //		state->offset = consumed;
 	}
 
-	return UINT_MAX;
+	match = UINT_MAX;
 
 found:
+	preempt_enable();
 	return match;
 }
 
