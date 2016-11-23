@@ -8407,9 +8407,9 @@ if (stack_copied_pattern == NULL \
 
     if (stack_copied_pattern)
         kmem_cache_free(stack_copied_pattern_cache, stack_copied_pattern);
-    if (named_groups);
+    if (named_groups)
         kmem_cache_free(named_groups_cache, named_groups);
-    if (c32workspace);
+    if (c32workspace)
         kmem_cache_free(c32workspace_cache, c32workspace);
 
     return NULL;
