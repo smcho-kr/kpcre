@@ -1,0 +1,7 @@
+Change Log for KPCRE
+--------------------
+
+Version 1.0 23-November-2016
+-----------------------------
+
+1. Fixed an issue about executing x86 SSE2 instructions under kernel mode
