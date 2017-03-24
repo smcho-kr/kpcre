@@ -1,11 +1,10 @@
-KLIBS_DEBUG ?= 0
 CODE_WIDTH ?= 8
 LIBC := ${PWD}/../libc/
 
-ifeq ($(KLIBS_DEBUG), 1)
-ccflags-y += -ggdb -DDEBUG
+ifeq ($(strip $(DEBUG)),)
+ccflags-y += -O3 -s
 else
-ccflags-y += -O2 -s
+ccflags-y += -ggdb -DDEBUG
 endif
 ccflags-y += -I${LIBC} \
     -DHAVE_CONFIG_H -DPCRE2_CODE_UNIT_WIDTH=${CODE_WIDTH}

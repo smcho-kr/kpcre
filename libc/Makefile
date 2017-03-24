@@ -1,9 +1,7 @@
-KLIBS_DEBUG ?= 0
-
-ifeq ($(KLIBS_DEBUG), 1)
-ccflags-y += -ggdb -DDEBUG
-else
+ifeq ($(strip $(DEBUG)),)
 ccflags-y += -O2 -s
+else
+ccflags-y += -ggdb -DDEBUG
 endif
 
 MODULES_DIR := /lib/modules/$(shell uname -r)
