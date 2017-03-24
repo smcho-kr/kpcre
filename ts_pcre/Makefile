@@ -1,12 +1,11 @@
-KLIBS_DEBUG ?= 0
 CODE_WIDTH ?= 8
 LIBC := ${PWD}/../libc
 PCRE2 := ${PWD}/../pcre2
 
-ifeq ($(KLIBS_DEBUG), 1)
-ccflags-y += -ggdb -DDEBUG
-else
+ifeq ($(strip $(DEBUG)),)
 ccflags-y += -O2 -s
+else
+ccflags-y += -ggdb -DDEBUG
 endif
 ccflags-y += -I$(LIBC) -I$(PCRE2) \
     -DPCRE2_CODE_UNIT_WIDTH=${CODE_WIDTH}

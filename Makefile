@@ -1,9 +1,3 @@
-ifeq ($(strip $(DEBUG)),)
-	export KLIBS_DEBUG=0
-else
-	export KLIBS_DEBUG=1
-endif
-
 ifeq ($(strip $(CODE_WIDTH)),)
 	export CODE_WIDTH=8
 endif
