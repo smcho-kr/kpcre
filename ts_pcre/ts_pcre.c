@@ -420,6 +420,8 @@ static void __exit ts_pcre_exit(void)
 	if (parse_regex)
 		pcre2_code_free(parse_regex);
 
+	pcre2_jit_free_unused_memory(NULL);
+
 	textsearch_unregister(&pcre_ops);
 }
 
