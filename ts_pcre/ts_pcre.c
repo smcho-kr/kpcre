@@ -72,7 +72,7 @@ static DEFINE_PER_CPU(pcre2_match_context *, match_context);
 static DEFINE_PER_CPU(pcre2_jit_stack *, jit_stack);
 
 #ifndef __get_cpu_var
-#define __get_cpu_var(var)	*this_cpu_ptr(&(var))
+#define __get_cpu_var(var)	*this_cpu_ptr(&var)
 #endif
 
 static unsigned int pcre_find(struct ts_config *conf, struct ts_state *state)
@@ -154,7 +154,7 @@ pattern_parse(const char *pattern, PCRE2_UCHAR ** pcre, PCRE2_UCHAR ** op_str)
 	int res, rc;
 
 	match_data = pcre2_match_data_create(4, NULL);
-	if (IS_ERR_OR_NULL(match_data)) {
+	if (!match_data) {
 		return -ENOMEM;
 	}
 
@@ -260,7 +260,7 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 	pcre.patlen = len;
 	pcre.pattern = calloc(len + 1, sizeof(u8));
 
-	if (IS_ERR_OR_NULL(pcre.pattern)) {
+	if (!pcre.pattern) {
 		pr_debug("%s: %s", __func__, "err_pattern");
 		goto err_pattern;
 	}
@@ -278,7 +278,7 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 
 	pcre.re = pcre2_compile(pcre.pcre_str, PCRE2_ZERO_TERMINATED, pcre.opts,
 				 &errorcode, &erroffset, NULL);
-	if (IS_ERR_OR_NULL(pcre.re)) {
+	if (!pcre.re) {
 		pr_debug("%s: %s", __func__, "err_pcre_compile");
 		goto err_pcre_compile;
 	}
@@ -378,7 +378,7 @@ static int __init ts_pcre_init(void)
 				    PCRE2_ZERO_TERMINATED, 0, &errorcode,
 				    &erroffset, NULL);
 
-	if (parse_regex == NULL)
+	if (!parse_regex)
 		goto err_compile;
 
     for_each_online_cpu(i) {

@@ -41,49 +41,86 @@ MODULE_DESCRIPTION("PCRE2 library");
 
 // sizeof(unsigned char)*MACHINE_STACK_SIZE
 struct kmem_cache *local_space_cache = NULL;
+char *local_space_cache_str = NULL;
 // sizeof(PCRE2_SIZE)*TEMP_MAX
 struct kmem_cache *local_offsets_cache = NULL;
+char *local_offsets_cache_str = NULL;
 // sizeof(int)*TEMP_MAX
 struct kmem_cache *local_workspace_cache = NULL;
+char *local_workspace_cache_str = NULL;
 
 // sizeof(unsigned char)*COPIED_PATTERN_SIZE
 struct kmem_cache *stack_copied_pattern_cache = NULL;
+char *stack_copied_pattern_cache_str = NULL;
 // sizeof(named_group)*NAMED_GROUP_LIST_SIZE
 struct kmem_cache *named_groups_cache = NULL;
+char *named_groups_cache_str = NULL;
 // sizeof(uint32_t)*C32_WORK_SIZE
 struct kmem_cache *c32workspace_cache = NULL;
+char *c32workspace_cache_str = NULL;
 
 static int __init pcre2_init(void)
 {
 	pr_debug("libpcre2 init\n");
 
-	local_space_cache = kmem_cache_create("local_space",
+	local_space_cache_str = kasprintf(GFP_KERNEL, \
+			"local_space_cache_%p", pcre2_init);
+	if (local_space_cache_str == NULL)
+		goto out_of_memory;
+
+	local_offsets_cache_str = kasprintf(GFP_KERNEL, \
+			"local_offsets_cache_%p", pcre2_init);
+	if (local_offsets_cache_str == NULL)
+		goto out_of_memory;
+
+	local_workspace_cache_str = kasprintf(GFP_KERNEL, \
+			"local_workspace_cache_%p", pcre2_init);
+	if (local_workspace_cache_str == NULL)
+		goto out_of_memory;
+
+	stack_copied_pattern_cache_str = kasprintf(GFP_KERNEL, \
+			"stack_copied_pattern_cache_%p", pcre2_init);
+	if (stack_copied_pattern_cache_str == NULL)
+		goto out_of_memory;
+
+	named_groups_cache_str = kasprintf(GFP_KERNEL, \
+			"named_groups_cache_%p", pcre2_init);
+	if (named_groups_cache_str == NULL)
+		goto out_of_memory;
+
+	c32workspace_cache_str = kasprintf(GFP_KERNEL, \
+			"c32workspace_cache_%p", pcre2_init);
+
+	if (c32workspace_cache_str == NULL)
+		goto out_of_memory;
+
+	local_space_cache = kmem_cache_create(local_space_cache_str,
 					      MACHINE_STACK_SIZE, 0, 0, NULL);
 	if (local_space_cache == NULL)
 		goto out_of_memory;
 
-	local_offsets_cache = kmem_cache_create("local_offsets",
+	local_offsets_cache = kmem_cache_create(local_offsets_cache_str,
 						sizeof(PCRE2_SIZE) * TEMP_MAX, 0, 0, NULL);
 	if (local_offsets_cache == NULL)
 		goto out_of_memory;
 
-	local_workspace_cache = kmem_cache_create("local_workspace",
+	local_workspace_cache = kmem_cache_create(local_workspace_cache_str,
 						  sizeof(int) * TEMP_MAX, 0, 0, NULL);
 	if (local_workspace_cache == NULL)
 		goto out_of_memory;
 
-	stack_copied_pattern_cache = kmem_cache_create("stack_copied_pattern",
+	stack_copied_pattern_cache = kmem_cache_create(stack_copied_pattern_cache_str,
 						       COPIED_PATTERN_SIZE, 0, 0, NULL);
 	if (stack_copied_pattern_cache == NULL)
 		goto out_of_memory;
 
-	named_groups_cache = kmem_cache_create("named_groups",
+	named_groups_cache = kmem_cache_create(named_groups_cache_str,
 					       sizeof(named_group) *
 					       NAMED_GROUP_LIST_SIZE, 0, 0, NULL);
 	if (named_groups_cache == NULL)
 		goto out_of_memory;
 
-	c32workspace_cache = kmem_cache_create("c32workspace",
+	c32workspace_cache = kmem_cache_create(c32workspace_cache_str,
 					       sizeof(uint32_t) * C32_WORK_SIZE, 0, 0, NULL);
 	if (c32workspace_cache == NULL)
 		goto out_of_memory;
@@ -109,6 +146,24 @@ static int __init pcre2_init(void)
 
 	if (c32workspace_cache)
 		kmem_cache_destroy(c32workspace_cache);
+
+	if (local_space_cache_str)
+		kfree(local_space_cache_str);
+
+	if (local_offsets_cache_str)
+		kfree(local_offsets_cache_str);
+
+	if (local_workspace_cache_str)
+		kfree(local_workspace_cache_str);
+
+	if (stack_copied_pattern_cache_str)
+		kfree(stack_copied_pattern_cache_str);
+
+	if (named_groups_cache_str)
+		kfree(named_groups_cache_str);
+
+	if (c32workspace_cache_str)
+		kfree(c32workspace_cache_str);
 
 	return -ENOMEM;
 
@@ -136,6 +191,23 @@ static void __exit pcre2_exit(void)
 	if (c32workspace_cache)
 		kmem_cache_destroy(c32workspace_cache);
 
+	if (local_space_cache_str)
+		kfree(local_space_cache_str);
+
+	if (local_offsets_cache_str)
+		kfree(local_offsets_cache_str);
+
+	if (local_workspace_cache_str)
+		kfree(local_workspace_cache_str);
+
+	if (stack_copied_pattern_cache_str)
+		kfree(stack_copied_pattern_cache_str);
+
+	if (named_groups_cache_str)
+		kfree(named_groups_cache_str);
+
+	if (c32workspace_cache_str)
+		kfree(c32workspace_cache_str);
 }
 
 module_init(pcre2_init);
