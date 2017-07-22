@@ -18,9 +18,11 @@
  */
 
 #include <linux/types.h>
-#include <linux/module.h>	/* Needed by all modules */
 #include <linux/kernel.h>	/* Needed for KERN_INFO */
+#include <linux/module.h>	/* Needed by all modules */
 #include <linux/slab.h>
+#include <linux/time.h>
+#include <linux/random.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Seongmyun Cho <highsky@gmail.com>");
@@ -30,29 +32,54 @@ void *malloc(size_t size)
 {
 	return kmalloc(size, GFP_ATOMIC);
 }
-
 EXPORT_SYMBOL(malloc);
 
 void *realloc(void *ptr, size_t size)
 {
 	return krealloc(ptr, size, GFP_ATOMIC);
 }
-
 EXPORT_SYMBOL(realloc);
 
 void *calloc(size_t nmemb, size_t size)
 {
 	return kcalloc(nmemb, size, GFP_ATOMIC);
 }
-
 EXPORT_SYMBOL(calloc);
 
 void free(void *ptr)
 {
 	kfree(ptr);
 }
-
 EXPORT_SYMBOL(free);
+
+long int random(void)
+{
+	long int rand;
+
+	get_random_bytes(&rand, sizeof(rand));
+
+	return rand;
+}
+EXPORT_SYMBOL(random);
+
+void srandom(unsigned int seed)
+{
+	return;
+}
+EXPORT_SYMBOL(srandom);
+
+time_t time(time_t *t)
+{
+    struct timespec ts;
+
+    getnstimeofday(&ts);
+
+    if (t)
+        *t = ts.tv_sec;
+    
+    return ts.tv_sec;
+}
+EXPORT_SYMBOL(time);
 
 static int __init libc_init(void)
 {

@@ -386,7 +386,7 @@ internal_dfa_match(
   uint32_t offsetcount,
   int *workspace,
   int wscount,
-  int  rlevel)
+  uint32_t  rlevel)
 {
 stateblock *active_states, *new_states, *temp_states;
 stateblock *next_active_state, *next_new_state;
@@ -428,7 +428,7 @@ if (unlikely(local_workspace == NULL))
 	panic("%s: Out of memory", __func__);
 #endif
 
-rlevel++;
+if (rlevel++ > mb->match_limit_recursion) return PCRE2_ERROR_RECURSIONLIMIT;
 offsetcount &= (uint32_t)(-2);  /* Round down */
 
 wscount -= 2;
@@ -2629,7 +2629,7 @@ for (;;)
 #endif
           rlevel);                              /* function recursion level */
 
-        if (rc == PCRE2_ERROR_DFA_UITEM) RETURN_DFA(rc);
+        if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) return rc;
         if ((rc >= 0) == (codevalue == OP_ASSERT || codevalue == OP_ASSERTBACK))
             { ADD_ACTIVE((int)(endasscode + LINK_SIZE + 1 - start_code), 0); }
         }
@@ -2758,7 +2758,7 @@ for (;;)
 #endif
             rlevel);                              /* function recursion level */
 
-          if (rc == PCRE2_ERROR_DFA_UITEM) RETURN_DFA(rc);
+          if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) return rc;
           if ((rc >= 0) ==
                 (condcode == OP_ASSERT || condcode == OP_ASSERTBACK))
             { ADD_ACTIVE((int)(endasscode + LINK_SIZE + 1 - start_code), 0); }
@@ -3193,7 +3193,7 @@ Returns:        > 0 => number of match offset pairs placed in offsets
 PCRE2_EXP_DEFN int PCRE2_CALL_CONVENTION
 pcre2_dfa_match(const pcre2_code *code, PCRE2_SPTR subject, PCRE2_SIZE length,
   PCRE2_SIZE start_offset, uint32_t options, pcre2_match_data *match_data,
-  pcre2_match_context *mcontext, int *workspace, size_t wscount)
+  pcre2_match_context *mcontext, int *workspace, PCRE2_SIZE wscount)
 {
 const pcre2_real_code *re = (const pcre2_real_code *)code;
 
@@ -3294,6 +3294,7 @@ if (mcontext == NULL)
   {
   mb->callout = NULL;
   mb->memctl = re->memctl;
+  mb->match_limit_recursion = PRIV(default_match_context).recursion_limit;
   }
 else
   {
@@ -3306,7 +3307,10 @@ else
   mb->callout = mcontext->callout;
   mb->callout_data = mcontext->callout_data;
   mb->memctl = mcontext->memctl;
+  mb->match_limit_recursion = mcontext->recursion_limit;
   }
+if (mb->match_limit_recursion > re->limit_recursion)
+  mb->match_limit_recursion = re->limit_recursion;
 
 mb->start_code = (PCRE2_UCHAR *)((uint8_t *)re + sizeof(pcre2_real_code)) +
   re->name_count * re->name_entry_size;
@@ -3548,7 +3552,7 @@ for (;;)
       {
       while (start_match < end_subject)
         {
-        register uint32_t c = UCHAR21TEST(start_match);
+        uint32_t c = UCHAR21TEST(start_match);
 #if PCRE2_CODE_UNIT_WIDTH != 8
         if (c > 255) c = 255;
 #endif
@@ -3588,7 +3592,7 @@ for (;;)
 
       if (has_req_cu && end_subject - start_match < REQ_CU_MAX)
         {
-        register PCRE2_SPTR p = start_match + (has_first_cu? 1:0);
+        PCRE2_SPTR p = start_match + (has_first_cu? 1:0);
 
         /* We don't need to repeat the search if we haven't yet reached the
         place we found it at last time. */
@@ -3599,7 +3603,7 @@ for (;;)
             {
             while (p < end_subject)
               {
-              register uint32_t pp = UCHAR21INCTEST(p);
+              uint32_t pp = UCHAR21INCTEST(p);
               if (pp == req_cu || pp == req_cu2) { p--; break; }
               }
             }

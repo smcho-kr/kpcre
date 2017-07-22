@@ -103,7 +103,7 @@ pattern_parse(const char *pattern, PCRE2_UCHAR ** pcre, PCRE2_UCHAR ** op_str)
     int res, rc;
 
     match_data = pcre2_match_data_create(4, NULL);
-    if (IS_ERR_OR_NULL(match_data)) {
+    if (!match_data) {
         return -ENOMEM;
     }
 
@@ -225,7 +225,7 @@ static struct ts_config *regex_init(const void *pattern, unsigned int len,
 	regex.patlen = len;
 	regex.pattern = calloc(len + 1, sizeof(u8));
 
-	if (IS_ERR_OR_NULL(regex.pattern)) {
+	if (!regex.pattern) {
 		pr_debug("%s: %s", __func__, "err_pattern");
 		goto err_pattern;
 	}
@@ -321,7 +321,7 @@ static int __init ts_regex_init(void)
                     PCRE2_ZERO_TERMINATED, 0, &errorcode,
                     &erroffset, NULL);
 
-    if (IS_ERR_OR_NULL(parse_regex)) {
+    if (!parse_regex) {
 #ifdef DEBUG
         PCRE2_UCHAR8 buffer[120];
         (void)pcre2_get_error_message(errorcode, buffer, 120);

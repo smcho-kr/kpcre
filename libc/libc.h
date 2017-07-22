@@ -5,7 +5,7 @@
 
 
 #if defined(__GNUC__)
-#define __WORDSIZE __SIZEOF_POINTER__
+#define __WORDSIZE (__SIZEOF_POINTER__ * 8)
 #endif
 
 /* We don't have #include_next.
@@ -80,11 +80,14 @@
 #   define UINT32_MAX      ((uint32_t)(4294967295U))
 #endif
 
-
 extern void *malloc(size_t size);
 extern void *realloc(void *ptr, size_t size);
 extern void *calloc(size_t nmemb, size_t size);
 extern void free(void *ptr);
 extern int snprintf(char *buf, size_t size, const char *fmt, ...);
+
+extern long int random(void);
+extern void srandom(unsigned int seed);
+extern time_t time(time_t *t);
 
 #endif /* _KERNEL_LIBC_H */
