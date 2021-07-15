@@ -94,12 +94,18 @@ static SLJIT_INLINE void free_chunk(void *chunk, sljit_uw size)
 
 #elif defined(__KERNEL__)
 
+#include <linux/version.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 
 static SLJIT_INLINE void* alloc_chunk(sljit_uw size)
 {
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+    return __vmalloc(size, GFP_ATOMIC | __GFP_HIGHMEM);
+#else
     return __vmalloc(size, GFP_ATOMIC | __GFP_HIGHMEM, PAGE_KERNEL_EXEC);
+#endif /* LINUX_VERSION_CODE */
 }
 
 static SLJIT_INLINE void free_chunk(void* chunk, sljit_uw size)

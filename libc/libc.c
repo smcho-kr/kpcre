@@ -21,7 +21,7 @@
 #include <linux/kernel.h>	/* Needed for KERN_INFO */
 #include <linux/module.h>	/* Needed by all modules */
 #include <linux/slab.h>
-#include <linux/time.h>
+#include <linux/ktime.h>
 #include <linux/random.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -68,11 +68,11 @@ void srandom(unsigned int seed)
 }
 EXPORT_SYMBOL(srandom);
 
-time_t time(time_t *t)
+time64_t time(time64_t *t)
 {
-    struct timespec ts;
+    struct timespec64 ts;
 
-    getnstimeofday(&ts);
+    ktime_get_real_ts64(&ts);
 
     if (t)
         *t = ts.tv_sec;

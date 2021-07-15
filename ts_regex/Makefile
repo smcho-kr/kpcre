@@ -12,7 +12,7 @@ ccflags-y += -I$(LIBC) -I$(PCRE2) \
 
 MODULES_DIR := /lib/modules/$(shell uname -r)
 KERNEL_DIR ?= ${MODULES_DIR}/build
-KBUILD_EXTRA_SYMBOLS += $(PCRE2)/Module.symvers
+KBUILD_EXTRA_SYMBOLS += $(LIBC)/Module.symvers $(PCRE2)/Module.symvers
 
 obj-m := ts_regex.o
 

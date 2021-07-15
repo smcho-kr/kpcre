@@ -88,6 +88,6 @@ extern int snprintf(char *buf, size_t size, const char *fmt, ...);
 
 extern long int random(void);
 extern void srandom(unsigned int seed);
-extern time_t time(time_t *t);
+extern time64_t time(time64_t *t);
 
 #endif /* _KERNEL_LIBC_H */
