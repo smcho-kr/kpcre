@@ -21,7 +21,7 @@ This is a new text search engine based on the PCRE kernel module.
 To get the source code from the git repository
 
 ```
-git clone https://github.com/xnsystems/kpcre.git
+git clone https://github.com/smcho-kr/kpcre.git
 ```
 
 ### Installing
