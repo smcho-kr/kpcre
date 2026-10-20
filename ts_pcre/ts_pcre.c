@@ -287,7 +287,7 @@ static struct ts_config *pcre_init(const void *pattern, unsigned int len,
 
 		rc = pcre2_jit_compile(pcre.re, PCRE2_JIT_COMPLETE);
 		if (rc < 0) {
-			pr_debug("%s: %s", __func__, "err_jit_compile");
+			pr_err("ts_pcre: JIT compilation failed (%d)\n", rc);
 			goto err_jit_compile;
 		}
 

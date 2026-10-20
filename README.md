@@ -71,3 +71,56 @@ modprobe -r ts_pcre
 ```
 
 There is also a REGEX text search engine. (ts_regex.ko)
+
+### JIT on distribution kernels (Linux 5.8+, x86-64)
+
+See [Restoring PCRE JIT Execution on Distribution Kernels](docs/kernel-jit-executable-memory.md)
+for the root cause, implementation details, validation results, and compatibility limits.
+
+The kernel JIT allocator uses separate pages for each generated function. Pages
+start writable/non-executable and become read-only/executable after generation.
+Allocation requires sleepable process context; matching remains usable in the
+text-search packet path. Freeing is deferred through the kernel's own worker.
+Each function also uses one writable metadata page, increasing memory usage.
+
+The tested distribution kernel does not export the required helpers. This port
+resolves `set_memory_ro`, `set_memory_x`, `find_vm_area`, and `vfree_atomic` using
+temporary disabled Kprobes during library initialization. No probe remains
+installed, and no symbol lookup occurs while matching. This is an internal-API
+compatibility workaround, not a stable kernel interface: revalidate after kernel
+updates.
+
+This path requires `CONFIG_X86_64=y`, `CONFIG_KPROBES=y`, permission to use Kprobes
+under the kernel's lockdown policy, and IBT/CFI disabled in the kernel configuration.
+The bundled SLJIT predates IBT/CFI support. Unsupported configurations or missing
+helpers reject JIT compilation; `ts_regex` and non-JIT matching remain available.
+Module signing requirements still apply. Kernels before 5.8 retain the old allocator.
+Rebuild all modules from a clean tree (`make clean` followed by `make modules`)
+after updating: the match-data layout now uses a flexible array, which also
+avoids UBSAN bounds warnings and changes module symbol version checksums.
+
+Run the allocator's host tests with `make -C tests check` on x86-64 Linux. They use
+simulated kernel APIs and real `mprotect` checks; they do not test kernel loading.
+
+For integration testing, build the modules, then run `make -C tests clean`
+and `make -C tests modules`.
+In a disposable VM running the matching kernel, load:
+
+```sh
+insmod libc/libc.ko
+insmod pcre2/libpcre2-8.ko
+insmod ts_pcre/ts_pcre.ko jit=1
+insmod ts_regex/ts_regex.ko
+insmod tests/kpcre_jit_test.ko
+dmesg | tail -30
+```
+
+The test calls `pcre2_jit_match` directly, checks partial and nonmatching inputs,
+and exercises both text-search engines across 32 allocate/free cycles. Expect
+`kpcre_jit_test: PASS`. Remove the test module and text-search modules before
+unloading the library; remove any rules using those engines first.
+
+Validated on `7.0.0-38-generic` (x86-64) in a diskless QEMU guest: three full
+module load/unload cycles and 96 test iterations passed without UBSAN warnings
+or kernel faults. This does not establish compatibility with other kernel
+configurations or measure throughput under real packet traffic.

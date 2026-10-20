@@ -11379,10 +11379,17 @@ while (label_addr != NULL)
   *label_addr->update_addr = sljit_get_label_addr(label_addr->label);
   label_addr = label_addr->next;
   }
+#ifdef KPCRE_KERNEL_EXEC
+if (executable_func != NULL && sljit_make_exec(executable_func) != 0)
+  {
+  sljit_free_code(executable_func);
+  executable_func = NULL;
+  }
+#endif
 sljit_free_compiler(compiler);
 if (executable_func == NULL)
   {
-  PRIV(jit_free_rodata)(common->read_only_data_head, compiler->allocator_data);
+  PRIV(jit_free_rodata)(common->read_only_data_head, allocator_data);
   return PCRE2_ERROR_NOMEMORY;
   }
 
@@ -11397,7 +11404,7 @@ else
     /* This case is highly unlikely since we just recently
     freed a lot of memory. Not impossible though. */
     sljit_free_code(executable_func);
-    PRIV(jit_free_rodata)(common->read_only_data_head, compiler->allocator_data);
+    PRIV(jit_free_rodata)(common->read_only_data_head, allocator_data);
     return PCRE2_ERROR_NOMEMORY;
     }
   memset(functions, 0, sizeof(executable_functions));
@@ -11461,6 +11468,10 @@ if ((options & ~PUBLIC_JIT_COMPILE_OPTIONS) != 0)
   return PCRE2_ERROR_JIT_BADOPTION;
 
 if ((re->flags & PCRE2_NOJIT) != 0) return 0;
+
+#ifdef KPCRE_KERNEL_EXEC
+if (!jit_exec_ready) return PCRE2_ERROR_JIT_BADOPTION;
+#endif
 
 functions = (executable_functions *)re->executable_jit;
 

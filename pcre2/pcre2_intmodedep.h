@@ -638,7 +638,7 @@ typedef struct pcre2_real_match_data {
   uint16_t         matchedby;     /* Type of match (normal, JIT, DFA) */
   uint16_t         oveccount;     /* Number of pairs */
   int              rc;            /* The return code from the match */
-  PCRE2_SIZE       ovector[1];    /* The first field */
+  PCRE2_SIZE       ovector[];     /* Variable-length array of offset triplets */
 } pcre2_real_match_data;
 
 

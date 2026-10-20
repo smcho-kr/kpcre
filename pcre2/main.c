@@ -141,6 +141,9 @@ static int __init pcre2_init(void)
 	if (c16workspace_cache == NULL)
 		goto out_of_memory;
 
+#if defined(SUPPORT_JIT) && defined(KPCRE_KERNEL_EXEC)
+	kpcre_jit_exec_init();
+#endif
 	return 0;
 
  out_of_memory:

@@ -55,7 +55,12 @@ pcre2test.c with CODE_UNIT_WIDTH == 0. */
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include "libc.h"
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+#define KPCRE_KERNEL_EXEC 1
+void kpcre_jit_exec_init(void);
+#endif
 #else
 /* Standard C headers */
 

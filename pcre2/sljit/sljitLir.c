@@ -255,7 +255,9 @@
 
 #if (defined SLJIT_EXECUTABLE_ALLOCATOR && SLJIT_EXECUTABLE_ALLOCATOR)
 
-#if (defined SLJIT_PROT_EXECUTABLE_ALLOCATOR && SLJIT_PROT_EXECUTABLE_ALLOCATOR)
+#ifdef KPCRE_KERNEL_EXEC
+#include "sljitKernelExecAllocator.c"
+#elif (defined SLJIT_PROT_EXECUTABLE_ALLOCATOR && SLJIT_PROT_EXECUTABLE_ALLOCATOR)
 #include "sljitProtExecAllocator.c"
 #else
 #include "sljitExecAllocator.c"
