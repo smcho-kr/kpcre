@@ -16,6 +16,8 @@ Original sources: ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre
 
 This is a new text search engine based on the PCRE kernel module.
 
+JIT support for `ts_pcre.ko` has been restored on supported kernels. For performance-sensitive workloads, I recommend testing `ts_pcre.ko` with JIT enabled before trying `ts_regex.ko`, as JIT compilation can provide much faster matching. See “JIT on distribution kernels (Linux 5.8+, x86-64)” below for requirements and compatibility limits.
+
 ### Getting the source code
 
 To get the source code from the git repository
