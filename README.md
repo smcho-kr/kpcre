@@ -85,7 +85,7 @@ Allocation requires sleepable process context; matching remains usable in the
 text-search packet path. Freeing is deferred through the kernel's own worker.
 Each function also uses one writable metadata page, increasing memory usage.
 
-The tested distribution kernel does not export the required helpers. This port
+Starting with Linux kernel 5.8, `__vmalloc()` no longer accepts the third (page-protection) argument, so the original allocator can no longer request `PAGE_KERNEL_EXEC` for JIT code. This port
 resolves `set_memory_ro`, `set_memory_x`, `find_vm_area`, and `vfree_atomic` using
 temporary disabled Kprobes during library initialization. No probe remains
 installed, and no symbol lookup occurs while matching. This is an internal-API
