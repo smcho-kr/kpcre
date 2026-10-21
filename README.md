@@ -66,6 +66,8 @@ iptables -A INPUT -m string --string "/\x7C\x7C.+[a-z]/i" --algo pcre -j DROP
 
 This wouldn't allow any incoming traffic that has the content matching the given PCRE in the payload.
 
+For practical filtering and alerting rules using `--algo pcre`, see [Practical iptables Examples with ts_pcre](https://github.com/smcho-kr/kpcre/wiki/Practical-iptables-Examples-with-ts_pcre). The guide includes nine common use cases, lightweight Snort-style IDS alerting, safe rule placement, testing, and important inspection limitations.
+
 In case you want to stop using the ts_pcre kernel module, first remove every iptables rule for ts_pcre and then type (as root):
 
 ```
