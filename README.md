@@ -58,13 +58,17 @@ modprobe ts_pcre
 If the module has been successfully loaded you shouldn't see any message.
 After loading the kernel module you can use iptables to add a rule.
 
-An example rule would be (as root):
+For example, block plaintext HTTP GET requests for the root-level `.env` file, which may contain application secrets (as root):
 
-```
-iptables -A INPUT -m string --string "/\x7C\x7C.+[a-z]/i" --algo pcre -j DROP
+```sh
+iptables -I INPUT 1 -p tcp --dport 80 \
+  -m string --algo pcre --string '/GET[ \t]+\/\.env(?:[? \t])/i' \
+  -j DROP
 ```
 
-This wouldn't allow any incoming traffic that has the content matching the given PCRE in the payload.
+This matches requests such as `GET /.env HTTP/1.1` and `GET /.env?download=1 HTTP/1.1`. The `i` modifier makes matching case-insensitive. The rule is inserted before existing ACCEPT rules so they do not bypass inspection; review the ordering of your existing firewall first.
+
+This is a defense-in-depth example, not a replacement for web-server access controls. It cannot inspect HTTPS or match a request split across packets or text-search blocks.
 
 For practical filtering and alerting rules using `--algo pcre`, see [Practical iptables Examples with ts_pcre](https://github.com/smcho-kr/kpcre/wiki/Practical-iptables-Examples-with-ts_pcre). The guide includes nine common use cases, lightweight Snort-style IDS alerting, safe rule placement, testing, and important inspection limitations.
 
