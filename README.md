@@ -58,17 +58,29 @@ modprobe ts_pcre
 If the module has been successfully loaded you shouldn't see any message.
 After loading the kernel module you can use iptables to add a rule.
 
-For example, block plaintext HTTP GET requests for the root-level `.env` file, which may contain application secrets (as root):
+For example, on an IPv4 gateway, block clients from querying an external DNS resolver for `www.blocked.com` over ordinary DNS (as root). Replace `br-lan` with the interface on which client DNS traffic enters the gateway:
 
 ```sh
-iptables -I INPUT 1 -p tcp --dport 80 \
-  -m string --algo pcre --string '/GET[ \t]+\/\.env(?:[? \t])/i' \
+LAN_IF=br-lan
+iptables -I FORWARD 1 -i "$LAN_IF" -p udp --dport 53 \
+  -m string --algo pcre --string '/\x03www\x07blocked\x03com\x00/i' \
+  -j DROP
+iptables -I FORWARD 1 -i "$LAN_IF" -p tcp --dport 53 \
+  -m string --algo pcre --string '/\x03www\x07blocked\x03com\x00/i' \
   -j DROP
 ```
 
-This matches requests such as `GET /.env HTTP/1.1` and `GET /.env?download=1 HTTP/1.1`. The `i` modifier makes matching case-insensitive. The rule is inserted before existing ACCEPT rules so they do not bypass inspection; review the ordering of your existing firewall first.
+DNS does **not** carry the dotted name `www.blocked.com` as one plaintext string. In the uncompressed [DNS wire format](https://www.rfc-editor.org/rfc/rfc1035#section-3.1), each label is preceded by its one-byte length, and a zero-length root label terminates the name:
 
-This is a defense-in-depth example, not a replacement for web-server access controls. It cannot inspect HTTPS or match a request split across packets or text-search blocks.
+```text
+\x03www\x07blocked\x03com\x00
+```
+
+Here `\x03` means a label length of 3, `\x07` means 7, and the final `\x00` terminates the name. Do not replace every dot with one fixed character: the length byte depends on the following label, and the first label needs one too. Single quotes preserve the textual `\xNN` escapes for PCRE to interpret as bytes; `i` makes the label comparison case-insensitive. Both rules are needed to cover ordinary DNS over UDP and TCP, regardless of whether the question asks for an A or AAAA record.
+
+These are packet-byte signatures, not a DNS parser: they also match a name such as `x.www.blocked.com`, whose encoded form contains the same suffix, or the same bytes elsewhere in the packet. Compressed names and matches split across packets or text-search blocks may evade detection. DROP causes a timeout rather than returning NXDOMAIN. For strict hostname policy, use a filtering DNS resolver.
+
+`FORWARD` applies only to routed traffic. Queries sent to a DNS resolver running on the gateway traverse `INPUT` instead; that resolver's own outbound queries traverse `OUTPUT`. Review rule ordering before insertion: inspect before broad ACCEPT rules, but retain required cheap rejection rules ahead of inspection. Add corresponding IPv6 rules where needed. DNS over HTTPS/TLS/QUIC, cached answers, and direct-IP connections are not blocked by this example; it is not a complete website-access policy.
 
 For practical filtering and alerting rules using `--algo pcre`, see [Practical iptables Examples with ts_pcre](https://github.com/smcho-kr/kpcre/wiki/Practical-iptables-Examples-with-ts_pcre). The guide includes nine common use cases, lightweight Snort-style IDS alerting, safe rule placement, testing, and important inspection limitations.
 
