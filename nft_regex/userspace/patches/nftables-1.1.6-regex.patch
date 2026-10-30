@@ -1,0 +1,321 @@
+diff --git a/include/json.h b/include/json.h
+index 3b8d045..0e0098c 100644
+--- a/include/json.h
++++ b/include/json.h
+@@ -78,6 +78,7 @@ json_t *ct_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *last_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *limit_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *fwd_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
++json_t *regex_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *notrack_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *dup_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+ json_t *meta_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+@@ -185,6 +186,7 @@ STMT_PRINT_STUB(ct)
+ STMT_PRINT_STUB(last)
+ STMT_PRINT_STUB(limit)
+ STMT_PRINT_STUB(fwd)
++STMT_PRINT_STUB(regex)
+ STMT_PRINT_STUB(notrack)
+ STMT_PRINT_STUB(dup)
+ STMT_PRINT_STUB(meta)
+diff --git a/include/statement.h b/include/statement.h
+index e8724dd..86a02bd 100644
+--- a/include/statement.h
++++ b/include/statement.h
+@@ -33,6 +33,12 @@ struct objref_stmt {
+ const char *objref_type_name(uint32_t type);
+ struct stmt *objref_stmt_alloc(const struct location *loc);
+ 
++struct regex_stmt {
++	const char *pattern;
++};
++
++struct stmt *regex_stmt_alloc(const struct location *loc, const char *pattern);
++
+ struct connlimit_stmt {
+ 	uint32_t		count;
+ 	uint32_t		flags;
+@@ -342,6 +348,7 @@ enum stmt_types {
+ 	STMT_CHAIN,
+ 	STMT_OPTSTRIP,
+ 	STMT_LAST,
++	STMT_REGEX,
+ };
+ 
+ /**
+@@ -387,6 +394,7 @@ struct stmt {
+ 		struct expr		*expr;
+ 		struct exthdr_stmt	exthdr;
+ 		struct meter_stmt	meter;
++		struct regex_stmt	regex;
+ 		struct connlimit_stmt	connlimit;
+ 		struct counter_stmt	counter;
+ 		struct payload_stmt	payload;
+diff --git a/src/evaluate.c b/src/evaluate.c
+index 4be5299..ed47f09 100644
+--- a/src/evaluate.c
++++ b/src/evaluate.c
+@@ -17,6 +17,7 @@
+ #include <linux/netfilter_arp.h>
+ #include <linux/netfilter/nf_tables.h>
+ #include <linux/netfilter/nf_synproxy.h>
++#include <linux/netfilter/nft_regex.h>
+ #include <linux/netfilter/nf_nat.h>
+ #include <linux/netfilter/nf_log.h>
+ #include <linux/netfilter_ipv4.h>
+@@ -5030,6 +5031,18 @@ static int stmt_evaluate_objref(struct eval_ctx *ctx, struct stmt *stmt)
+ 	return 0;
+ }
+ 
++static int stmt_evaluate_regex(struct eval_ctx *ctx, struct stmt *stmt)
++{
++	size_t len = strlen(stmt->regex.pattern);
++
++	if (!len || len > NFT_REGEX_PATTERN_MAX)
++		return stmt_error(ctx, stmt, "Regex pattern must contain 1..255 bytes");
++	if (eval_proto_ctx(ctx)->family != NFPROTO_IPV4 && eval_proto_ctx(ctx)->family != NFPROTO_IPV6 &&
++	    eval_proto_ctx(ctx)->family != NFPROTO_INET)
++		return stmt_error(ctx, stmt, "Regex requires an ip, ip6 or inet table");
++	return 0;
++}
++
+ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
+ {
+ 	if (ctx->nft->debug_mask & NFT_DEBUG_EVALUATION) {
+@@ -5045,6 +5058,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
+ 	ctx->stmt_len = 0;
+ 
+ 	switch (stmt->type) {
++	case STMT_REGEX:
++		return stmt_evaluate_regex(ctx, stmt);
+ 	case STMT_CONNLIMIT:
+ 	case STMT_COUNTER:
+ 	case STMT_LAST:
+diff --git a/src/json.c b/src/json.c
+index 9fb6d71..8ee2999 100644
+--- a/src/json.c
++++ b/src/json.c
+@@ -1424,6 +1424,11 @@ json_t *fwd_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+ 	return nft_json_pack("{s:o}", "fwd", root);
+ }
+ 
++json_t *regex_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
++{
++	return nft_json_pack("{s:{s:s}}", "regex", "pattern", stmt->regex.pattern);
++}
++
+ json_t *notrack_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+ {
+ 	return nft_json_pack("{s:n}", "notrack");
+diff --git a/src/netlink_delinearize.c b/src/netlink_delinearize.c
+index 9561e29..6158761 100644
+--- a/src/netlink_delinearize.c
++++ b/src/netlink_delinearize.c
+@@ -1021,6 +1021,14 @@ static void netlink_parse_numgen(struct netlink_parse_ctx *ctx,
+ 	netlink_set_register(ctx, dreg, expr);
+ }
+ 
++static void netlink_parse_regex(struct netlink_parse_ctx *ctx,
++				const struct location *loc,
++				const struct nftnl_expr *nle)
++{
++	ctx->stmt = regex_stmt_alloc(loc,
++		nftnl_expr_get_str(nle, NFTNL_EXPR_REGEX_PATTERN));
++}
++
+ static void netlink_parse_notrack(struct netlink_parse_ctx *ctx,
+ 				  const struct location *loc,
+ 				  const struct nftnl_expr *nle)
+@@ -1950,6 +1958,7 @@ static const struct expr_handler netlink_parsers[] = {
+ 	{ .name = "reject",	.parse = netlink_parse_reject },
+ 	{ .name = "nat",	.parse = netlink_parse_nat },
+ 	{ .name = "tproxy",	.parse = netlink_parse_tproxy },
++	{ .name = "regex",	.parse = netlink_parse_regex },
+ 	{ .name = "notrack",	.parse = netlink_parse_notrack },
+ 	{ .name = "masq",	.parse = netlink_parse_masq },
+ 	{ .name = "redir",	.parse = netlink_parse_redir },
+diff --git a/src/netlink_linearize.c b/src/netlink_linearize.c
+index 30bc009..f0989b6 100644
+--- a/src/netlink_linearize.c
++++ b/src/netlink_linearize.c
+@@ -1557,6 +1557,15 @@ static void netlink_gen_ct_stmt(struct netlink_linearize_ctx *ctx,
+ 	nft_rule_add_expr(ctx, nle, &stmt->location);
+ }
+ 
++static void netlink_gen_regex_stmt(struct netlink_linearize_ctx *ctx,
++				   const struct stmt *stmt)
++{
++	struct nftnl_expr *nle = alloc_nft_expr("regex");
++
++	nftnl_expr_set_str(nle, NFTNL_EXPR_REGEX_PATTERN, stmt->regex.pattern);
++	nft_rule_add_expr(ctx, nle, &stmt->location);
++}
++
+ static void netlink_gen_notrack_stmt(struct netlink_linearize_ctx *ctx,
+ 				     const struct stmt *stmt)
+ {
+@@ -1749,6 +1758,8 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
+ 		nle = netlink_gen_stmt_stateful(stmt);
+ 		nft_rule_add_expr(ctx, nle, &stmt->location);
+ 		break;
++	case STMT_REGEX:
++		return netlink_gen_regex_stmt(ctx, stmt);
+ 	case STMT_NOTRACK:
+ 		return netlink_gen_notrack_stmt(ctx, stmt);
+ 	case STMT_FLOW_OFFLOAD:
+diff --git a/src/parser_bison.y b/src/parser_bison.y
+index 3ceef79..d2172a0 100644
+--- a/src/parser_bison.y
++++ b/src/parser_bison.y
+@@ -698,6 +698,11 @@ int nft_lex(void *, void *, void *);
+ %token JSON			"json"
+ %token VM			"vm"
+ 
++%token <string> REGEX			"regex clause"
++%destructor { free_const($$); } REGEX
++%type <stmt> regex_stmt
++%destructor { stmt_free($$); } regex_stmt
++
+ %token NOTRACK			"notrack"
+ 
+ %token EXISTS			"exists"
+@@ -3261,7 +3266,8 @@ stateful_stmt		:	counter_stmt	close_scope_counter
+ 			|	last_stmt	close_scope_last
+ 			;
+ 
+-stmt			:	verdict_stmt
++stmt			:	regex_stmt
++			|	verdict_stmt
+ 			|	match_stmt
+ 			|	meter_stmt
+ 			|	payload_stmt
+@@ -3286,6 +3292,13 @@ stmt			:	verdict_stmt
+ 			|	objref_stmt
+ 			;
+ 
++regex_stmt		:	REGEX
++			{
++				$$ = regex_stmt_alloc(&@$, $1);
++				free_const($1);
++			}
++			;
++
+ xt_stmt			:	XT	STRING	string
+ 			{
+ 				$$ = NULL;
+diff --git a/src/parser_json.c b/src/parser_json.c
+index 7b4f338..0445eca 100644
+--- a/src/parser_json.c
++++ b/src/parser_json.c
+@@ -2165,6 +2165,21 @@ static struct stmt *json_parse_flow_offload_stmt(struct json_ctx *ctx,
+ 	return flow_offload_stmt_alloc(int_loc, xstrdup(flowtable + 1));
+ }
+ 
++static struct stmt *json_parse_regex_stmt(struct json_ctx *ctx,
++					  const char *key, json_t *value)
++{
++	json_t *pattern;
++
++	if (json_unpack_err(ctx, value, "{s:o}", "pattern", &pattern))
++		return NULL;
++	if (!json_is_string(pattern) ||
++	    strlen(json_string_value(pattern)) != json_string_length(pattern)) {
++		json_error(ctx, "Regex pattern must be a string without embedded NULs");
++		return NULL;
++	}
++	return regex_stmt_alloc(int_loc, json_string_value(pattern));
++}
++
+ static struct stmt *json_parse_notrack_stmt(struct json_ctx *ctx,
+ 					    const char *key, json_t *value)
+ {
+@@ -2885,6 +2900,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
+ 		{ "limit", json_parse_limit_stmt },
+ 		{ "flow", json_parse_flow_offload_stmt },
+ 		{ "fwd", json_parse_fwd_stmt },
++		{ "regex", json_parse_regex_stmt },
+ 		{ "notrack", json_parse_notrack_stmt },
+ 		{ "dup", json_parse_dup_stmt },
+ 		{ "snat", json_parse_nat_stmt },
+diff --git a/src/scanner.l b/src/scanner.l
+index df8e536..4d234ba 100644
+--- a/src/scanner.l
++++ b/src/scanner.l
+@@ -904,6 +904,24 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
+ 				return STRING;
+ 			}
+ 
++ /* Consume the whole clause so regex remains an ordinary identifier elsewhere. */
++regex[ \t]+\"([^"\\]|\\(.|\n))*\" {
++				char *p, *out, *pattern;
++
++				if (memchr(yytext, 0, yyleng))
++					return JUNK;
++				pattern = xmalloc(yyleng);
++				p = strchr(yytext, '"') + 1;
++				for (out = pattern; p < yytext + yyleng - 1; p++) {
++					if (*p == '\\' && (p[1] == '\\' || p[1] == '"'))
++						p++;
++					*out++ = *p;
++				}
++				*out = 0;
++				yylval->string = pattern;
++				return REGEX;
++			}
++
+ {quotedstring}		{
+ 				yytext[yyleng - 1] = '\0';
+ 				yylval->string = xstrdup(yytext + 1);
+diff --git a/src/statement.c b/src/statement.c
+index d0993dd..c0155f0 100644
+--- a/src/statement.c
++++ b/src/statement.c
+@@ -205,6 +205,40 @@ struct stmt *meter_stmt_alloc(const struct location *loc)
+ 	return stmt_alloc(loc, &meter_stmt_ops);
+ }
+ 
++static void regex_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
++{
++	const unsigned char *p = (const void *)stmt->regex.pattern;
++
++	nft_print(octx, "regex \"");
++	for (; *p; p++) {
++		if (*p == '\\' || *p == '"')
++			nft_print(octx, "\\");
++		nft_print(octx, "%c", *p);
++	}
++	nft_print(octx, "\"");
++}
++
++static void regex_stmt_destroy(struct stmt *stmt)
++{
++	free_const(stmt->regex.pattern);
++}
++
++static const struct stmt_ops regex_stmt_ops = {
++	.type = STMT_REGEX,
++	.name = "regex",
++	.print = regex_stmt_print,
++	.json = regex_stmt_json,
++	.destroy = regex_stmt_destroy,
++};
++
++struct stmt *regex_stmt_alloc(const struct location *loc, const char *pattern)
++{
++	struct stmt *stmt = stmt_alloc(loc, &regex_stmt_ops);
++
++	stmt->regex.pattern = xstrdup(pattern);
++	return stmt;
++}
++
+ static void connlimit_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+ {
+ 	nft_print(octx, "ct count %s%u",
+@@ -1125,6 +1159,7 @@ static const struct stmt_ops *__stmt_ops_by_type(enum stmt_types type)
+ 	case STMT_CHAIN: return &chain_stmt_ops;
+ 	case STMT_OPTSTRIP: return &optstrip_stmt_ops;
+ 	case STMT_LAST: return &last_stmt_ops;
++	case STMT_REGEX: return &regex_stmt_ops;
+ 	default:
+ 		break;
+ 	}

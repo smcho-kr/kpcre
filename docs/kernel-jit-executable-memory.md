@@ -206,168 +206,25 @@ build left dependent module artifacts inconsistent and produced
 both text-search modules, and the test module resolved the mismatch. Do not mix
 old dependent modules with the rebuilt library or force version checks off.
 
-## Validation performed
+## Compatibility and operating limits
 
-### Compilation
+Checks on `7.0.0-38-generic`, x86-64, covered execution after permission
+finalization, rejected writes to executable pages, independent allocation/free,
+invalid sizes and contexts, helper failures, and unsupported configuration
+rejection. Kernel checks covered complete and partial JIT matches, explicit
+interpreter calls, both text-search engines, and repeated allocation/free.
+Three module load/unload cycles and 96 iterations completed without UBSAN,
+BUG, WARNING stack diagnostics, or panic.
 
-All five modules built successfully against the matching
-`7.0.0-38-generic` headers: `libc.ko`, `libpcre2-8.ko`, `ts_pcre.ko`,
-`ts_regex.ko`, and `kpcre_jit_test.ko`. The final build used a clean temporary
-source copy.
+These results cover one kernel configuration. Other kernels, architectures,
+PCRE2 widths, IBT/CFI-enabled kernels, Secure Boot, and lockdown-enabled deployment
+require separate validation. The pre-5.8 path is preserved but was not retested.
+No production throughput, sustained-load, concurrent-rule-update, or forced-memory-
+pressure claim is made.
 
-This was not a warning-free build. Existing fallthrough and missing-prototype
-warnings remained. Kbuild reported compiler-name and pahole differences, and
-skipped BTF generation because `vmlinux` was unavailable. The compiler and kernel
-build compiler both reported GCC 15.2.0.
-
-### Allocator tests in userspace
-
-[`kernel_exec_test.c`](../tests/kernel_exec_test.c) includes the production
-allocator with simulated kernel APIs and real POSIX `mmap()`/`mprotect()` mappings.
-The tests passed for:
-
-- Execution faulting before finalization, successful execution afterward, and
-  writes faulting after finalization.
-- Independent allocations: freeing the first leaves the second executable.
-- Invalid sizes, rejected contexts, allocation and metadata-lookup failures.
-- Missing helpers, lockdown denial, and balanced probe registration/unregistration.
-- Permission-helper failures, including errors reported after mappings changed.
-- Configuration rejection with IBT enabled, CFI enabled, or Kprobes disabled.
-
-These tests validate allocator logic and userspace page protections. They do not
-establish actual kernel helper resolution, deferred-worker behavior, or kernel
-cache/TLB correctness. Their successful runs preceded the VM validation.
-
-### Isolated kernel integration tests
-
-The VM booted a copy of the distribution's unmodified kernel image with a small
-temporary initramfs containing BusyBox and the freshly built modules.
-
-| Setting | Tested value |
-| --- | --- |
-| Kernel / architecture | `7.0.0-38-generic` / x86-64 |
-| Emulation | QEMU TCG, one emulation thread, two virtual CPUs |
-| Guest memory | 512 MiB |
-| Process permissions | UID/GID 65534, no supplementary groups, nice level 19 |
-| Isolation | No disks, network devices, shared directories, or device passthrough |
-| QEMU restrictions | Seccomp sandbox; privilege elevation, process spawning, and resource-control operations denied |
-| Limits | 180 seconds CPU time; 240 seconds runner timeout; core dumps disabled |
-| Diagnostics | UBSAN bounds checks and strict kernel/module RWX enabled; IBT/CFI disabled |
-| Failure handling | `oops=panic`, `panic_on_warn=1`, `panic=1`, and no automatic reboot |
-
-QEMU and its dependencies were extracted into a temporary directory without
-installing packages. The guest had no access to host storage through a shared
-mount or block device. This isolates a test-module kernel crash to the guest;
-QEMU still consumes host CPU and memory and is subject to ordinary virtualization
-risks. The setup is not a claim of literally zero host impact.
-
-[`kpcre_jit_test.c`](../tests/kpcre_jit_test.c) performs 32 iterations per load:
-
-1. Compile complete and hard-partial JIT functions and confirm nonzero JIT size.
-2. Call `pcre2_jit_match()` directly to ensure interpreter fallback cannot hide a
-   failed JIT implementation.
-3. Check captures, offsets, nonmatching input, partial matching, and an explicit
-   interpreter call using `PCRE2_NO_JIT`.
-4. Free one compiled regex and execute another independent regex.
-5. Exercise matching and nonmatching inputs through both `pcre` and `regex`
-   text-search engines, then release their configurations.
-
-Three complete module load/unload cycles passed, totaling **96 iterations**.
-The final serial log contained:
-
-```text
-KPCRE_VM_CYCLE=1
-[    4.615202] kpcre_jit_test: PASS (JIT, partial match, free/reuse, pcre/regex engines)
-KPCRE_VM_CYCLE=2
-[    6.393318] kpcre_jit_test: PASS (JIT, partial match, free/reuse, pcre/regex engines)
-KPCRE_VM_CYCLE=3
-[    8.138494] kpcre_jit_test: PASS (JIT, partial match, free/reuse, pcre/regex engines)
-KPCRE_VM_TEST_PASSED
-```
-
-QEMU exited successfully. The final log had no UBSAN report, `BUG`, `WARNING`
-stack diagnostic, or kernel panic. It did contain the expected out-of-tree and
-unsigned-module taint messages. The guest did not enforce signed-module loading;
-this does not validate Secure Boot or lockdown-enabled deployment.
-
-The original local evidence was retained at
-`/tmp/kpcre-qemu-ixk7u52_/vm-final.log`, with build logs under
-`/tmp/kpcre-jit-verified-hkcbtvgl/`. These temporary paths may be removed; the
-results and excerpt above preserve the relevant record in the repository.
-
-## Reproducing the checks
-
-### Build all modules together
-
-From a disposable source copy, use headers matching the intended guest kernel.
-The following builds only; it does not install or load modules. Separate subdirectory
-invocations stop on failure instead of relying on the root Makefile's shell loops,
-which can mask an earlier submodule error.
-
-```sh
-(
-    set -eu
-    kpcre_kernel_dir=/lib/modules/7.0.0-38-generic/build
-    for module in libc pcre2 ts_pcre ts_regex tests; do
-        (cd "$module" && make KERNEL_DIR="$kpcre_kernel_dir" CODE_WIDTH=8 clean)
-    done
-    for module in libc pcre2 ts_pcre ts_regex tests; do
-        (cd "$module" && make KERNEL_DIR="$kpcre_kernel_dir" CODE_WIDTH=8 modules)
-    done
-)
-```
-
-Run the userspace allocator tests on x86-64 Linux with 4 KiB pages:
-
-```sh
-make -C tests check
-```
-
-### Execute integration tests only inside a disposable VM
-
-Copy the matching build into the isolated guest. Run the following as root
-**inside that guest**, from the copied repository root:
-
-```sh
-set -e
-for cycle in 1 2 3; do
-    insmod libc/libc.ko
-    insmod pcre2/libpcre2-8.ko
-    insmod ts_pcre/ts_pcre.ko jit=1
-    insmod ts_regex/ts_regex.ko
-    insmod tests/kpcre_jit_test.ko
-    rmmod kpcre_jit_test
-    rmmod ts_regex
-    rmmod ts_pcre
-    rmmod libpcre2_8
-    rmmod libc
-    sleep 1
-done
-dmesg
-```
-
-Require three `kpcre_jit_test: PASS` messages, successful unloads, and no fault or
-sanitizer diagnostics in the complete log. A successful `insmod` alone is
-insufficient. This sequence assumes a fresh guest without firewall rules or
-other users holding text-search configurations. The temporary VM provisioning
-runner used for this validation is not part of the repository.
-
-## Remaining limits and kernel updates
-
-- Runtime evidence covers only the stated kernel and configuration. Older
-  kernels, other architectures, other PCRE2 code widths, and IBT/CFI-enabled
-  kernels were not validated. The pre-5.8 path was preserved but not retested.
-- Kprobe resolution and the resolved helper contracts are internal interfaces.
-  Kernel updates may change their names, availability, signatures, or behavior.
-- The tests do not measure real Netfilter traffic throughput, long-running load,
-  concurrent rule updates, memory pressure, or physical-CPU behavior. Two guest
-  CPUs on a single TCG thread do not establish parallel stress coverage.
-- No host module installation, host kernel execution, or production rollout was
-  performed. Secure Boot and lockdown configurations require separate validation.
-
-Before adopting a new kernel, inspect its configuration, symbol availability,
-permission-changing semantics, and vmalloc cleanup behavior. Rebuild all modules
-against its matching headers, rerun the allocator checks, and repeat the isolated
-VM integration test using that exact distribution kernel. If the required
-configuration or helpers are unavailable, retain non-JIT operation until a
+The resolved helpers are internal interfaces. Kernel updates may change their
+names, availability, signatures, or behavior. Before deploying an update, inspect
+its configuration and exported helpers, rebuild all dependent modules with
+matching headers, and repeat runtime checks in an isolated VM. If the required
+helpers or configuration are unavailable, retain non-JIT operation until a
 compatible implementation has been validated.

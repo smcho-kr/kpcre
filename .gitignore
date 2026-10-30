@@ -32,6 +32,8 @@
 *.dSYM/
 
 # Linux Kernel Module
+*.mod
+.build/
 *.tmp_versions
 *.cmd
 *.mod.c

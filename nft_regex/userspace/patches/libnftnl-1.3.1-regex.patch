@@ -1,0 +1,219 @@
+diff --git a/include/libnftnl/expr.h b/include/libnftnl/expr.h
+index 1c07b54..729f07a 100644
+--- a/include/libnftnl/expr.h
++++ b/include/libnftnl/expr.h
+@@ -363,6 +363,11 @@ enum {
+ 	__NFTNL_EXPR_INNER_MAX
+ };
+ 
++enum {
++	NFTNL_EXPR_REGEX_PATTERN = NFTNL_EXPR_BASE,
++	__NFTNL_EXPR_REGEX_MAX
++};
++
+ #ifdef __cplusplus
+ } /* extern "C" */
+ #endif
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 1c38d00..56cb49d 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -26,6 +26,7 @@ libnftnl_la_SOURCES = utils.c		\
+ 		      expr/byteorder.c	\
+ 		      expr/cmp.c	\
+ 		      expr/range.c	\
++		      expr/regex.c	\
+ 		      expr/connlimit.c	\
+ 		      expr/counter.c	\
+ 		      expr/ct.c		\
+diff --git a/src/Makefile.in b/src/Makefile.in
+index d3c956f..4fcf026 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -138,7 +138,7 @@ am_libnftnl_la_OBJECTS = utils.lo batch.lo flowtable.lo common.lo \
+ 	gen.lo table.lo trace.lo chain.lo object.lo rule.lo set.lo \
+ 	set_elem.lo str_array.lo ruleset.lo udata.lo expr.lo \
+ 	expr_ops.lo expr/bitwise.lo expr/byteorder.lo expr/cmp.lo \
+-	expr/range.lo expr/connlimit.lo expr/counter.lo expr/ct.lo \
++	expr/range.lo expr/regex.lo expr/connlimit.lo expr/counter.lo expr/ct.lo \
+ 	expr/data_reg.lo expr/dup.lo expr/exthdr.lo \
+ 	expr/flow_offload.lo expr/fib.lo expr/fwd.lo expr/last.lo \
+ 	expr/limit.lo expr/log.lo expr/lookup.lo expr/dynset.lo \
+@@ -183,7 +183,7 @@ am__depfiles_remade = ./$(DEPDIR)/batch.Plo ./$(DEPDIR)/chain.Plo \
+ 	./$(DEPDIR)/trace.Plo ./$(DEPDIR)/udata.Plo \
+ 	./$(DEPDIR)/utils.Plo expr/$(DEPDIR)/bitwise.Plo \
+ 	expr/$(DEPDIR)/byteorder.Plo expr/$(DEPDIR)/cmp.Plo \
+-	expr/$(DEPDIR)/connlimit.Plo expr/$(DEPDIR)/counter.Plo \
++	expr/$(DEPDIR)/regex.Plo expr/$(DEPDIR)/connlimit.Plo expr/$(DEPDIR)/counter.Plo \
+ 	expr/$(DEPDIR)/ct.Plo expr/$(DEPDIR)/data_reg.Plo \
+ 	expr/$(DEPDIR)/dup.Plo expr/$(DEPDIR)/dynset.Plo \
+ 	expr/$(DEPDIR)/exthdr.Plo expr/$(DEPDIR)/fib.Plo \
+@@ -431,6 +431,7 @@ libnftnl_la_SOURCES = utils.c		\
+ 		      expr/byteorder.c	\
+ 		      expr/cmp.c	\
+ 		      expr/range.c	\
++		      expr/regex.c	\
+ 		      expr/connlimit.c	\
+ 		      expr/counter.c	\
+ 		      expr/ct.c		\
+@@ -555,6 +556,7 @@ expr/bitwise.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/byteorder.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/cmp.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/range.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
++expr/regex.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/connlimit.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/counter.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+ expr/ct.lo: expr/$(am__dirstamp) expr/$(DEPDIR)/$(am__dirstamp)
+@@ -641,6 +643,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/bitwise.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/byteorder.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/cmp.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/regex.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/connlimit.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/counter.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@expr/$(DEPDIR)/ct.Plo@am__quote@ # am--include-marker
+@@ -877,6 +880,7 @@ distclean: distclean-am
+ 	-rm -f expr/$(DEPDIR)/bitwise.Plo
+ 	-rm -f expr/$(DEPDIR)/byteorder.Plo
+ 	-rm -f expr/$(DEPDIR)/cmp.Plo
++	-rm -f expr/$(DEPDIR)/regex.Plo
+ 	-rm -f expr/$(DEPDIR)/connlimit.Plo
+ 	-rm -f expr/$(DEPDIR)/counter.Plo
+ 	-rm -f expr/$(DEPDIR)/ct.Plo
+@@ -988,6 +992,7 @@ maintainer-clean: maintainer-clean-am
+ 	-rm -f expr/$(DEPDIR)/bitwise.Plo
+ 	-rm -f expr/$(DEPDIR)/byteorder.Plo
+ 	-rm -f expr/$(DEPDIR)/cmp.Plo
++	-rm -f expr/$(DEPDIR)/regex.Plo
+ 	-rm -f expr/$(DEPDIR)/connlimit.Plo
+ 	-rm -f expr/$(DEPDIR)/counter.Plo
+ 	-rm -f expr/$(DEPDIR)/ct.Plo
+diff --git a/src/expr/regex.c b/src/expr/regex.c
+new file mode 100644
+index 0000000..6db5167
+--- /dev/null
++++ b/src/expr/regex.c
+@@ -0,0 +1,103 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++#include <stdio.h>
++#include <string.h>
++#include <errno.h>
++#include <linux/netfilter/nft_regex.h>
++#include "internal.h"
++#include <libmnl/libmnl.h>
++#include <libnftnl/expr.h>
++
++struct nftnl_expr_regex {
++	char pattern[NFT_REGEX_PATTERN_MAX + 1];
++};
++
++static int nftnl_expr_regex_set(struct nftnl_expr *e, uint16_t type,
++				const void *data, uint32_t len)
++{
++	struct nftnl_expr_regex *regex = nftnl_expr_data(e);
++
++	if (type != NFTNL_EXPR_REGEX_PATTERN || len < 2 ||
++	    len > sizeof(regex->pattern) || ((const char *)data)[len - 1] ||
++	    memchr(data, 0, len - 1)) {
++		errno = EINVAL;
++		return -1;
++	}
++	memcpy(regex->pattern, data, len);
++	return 0;
++}
++
++static const void *nftnl_expr_regex_get(const struct nftnl_expr *e, uint16_t type,
++				      uint32_t *len)
++{
++	struct nftnl_expr_regex *regex = nftnl_expr_data(e);
++
++	if (type != NFTNL_EXPR_REGEX_PATTERN)
++		return NULL;
++	*len = strlen(regex->pattern) + 1;
++	return regex->pattern;
++}
++
++static int nftnl_expr_regex_cb(const struct nlattr *attr, void *data)
++{
++	const struct nlattr **tb = data;
++	unsigned int len;
++
++	if (mnl_attr_get_type(attr) != NFTA_REGEX_PATTERN)
++		return MNL_CB_OK;
++	len = mnl_attr_get_payload_len(attr);
++	if (mnl_attr_validate(attr, MNL_TYPE_NUL_STRING) < 0 || len < 2 ||
++	    len > NFT_REGEX_PATTERN_MAX + 1 ||
++	    memchr(mnl_attr_get_payload(attr), 0, len - 1)) {
++		errno = EINVAL;
++		return MNL_CB_ERROR;
++	}
++	tb[NFTA_REGEX_PATTERN] = attr;
++	return MNL_CB_OK;
++}
++
++static int nftnl_expr_regex_parse(struct nftnl_expr *e, struct nlattr *attr)
++{
++	const struct nlattr *tb[NFTA_REGEX_MAX + 1] = {};
++
++	if (mnl_attr_parse_nested(attr, nftnl_expr_regex_cb, tb) < 0)
++		return -1;
++	if (!tb[NFTA_REGEX_PATTERN]) {
++		errno = EINVAL;
++		return -1;
++	}
++	return nftnl_expr_set(e, NFTNL_EXPR_REGEX_PATTERN,
++		mnl_attr_get_payload(tb[NFTA_REGEX_PATTERN]),
++		mnl_attr_get_payload_len(tb[NFTA_REGEX_PATTERN]));
++}
++
++static void nftnl_expr_regex_build(struct nlmsghdr *nlh, const struct nftnl_expr *e)
++{
++	struct nftnl_expr_regex *regex = nftnl_expr_data(e);
++
++	if (e->flags & (1 << NFTNL_EXPR_REGEX_PATTERN))
++		mnl_attr_put_strz(nlh, NFTA_REGEX_PATTERN, regex->pattern);
++}
++
++static int nftnl_expr_regex_output(char *buf, size_t len, uint32_t flags,
++				  const struct nftnl_expr *e)
++{
++	struct nftnl_expr_regex *regex = nftnl_expr_data(e);
++
++	return snprintf(buf, len, "pattern %s ", regex->pattern);
++}
++
++static struct attr_policy regex_policy[__NFTNL_EXPR_REGEX_MAX] = {
++	[NFTNL_EXPR_REGEX_PATTERN] = { .maxlen = NFT_REGEX_PATTERN_MAX + 1 },
++};
++
++struct expr_ops expr_ops_regex = {
++	.name = "regex",
++	.alloc_len = sizeof(struct nftnl_expr_regex),
++	.nftnl_max_attr = __NFTNL_EXPR_REGEX_MAX - 1,
++	.attr_policy = regex_policy,
++	.set = nftnl_expr_regex_set,
++	.get = nftnl_expr_regex_get,
++	.parse = nftnl_expr_regex_parse,
++	.build = nftnl_expr_regex_build,
++	.output = nftnl_expr_regex_output,
++};
+diff --git a/src/expr_ops.c b/src/expr_ops.c
+index b85f472..be862e9 100644
+--- a/src/expr_ops.c
++++ b/src/expr_ops.c
+@@ -7,6 +7,7 @@
+ extern struct expr_ops expr_ops_bitwise;
+ extern struct expr_ops expr_ops_byteorder;
+ extern struct expr_ops expr_ops_cmp;
++extern struct expr_ops expr_ops_regex;
+ extern struct expr_ops expr_ops_connlimit;
+ extern struct expr_ops expr_ops_counter;
+ extern struct expr_ops expr_ops_ct;
+@@ -52,6 +53,7 @@ static struct expr_ops *expr_ops[] = {
+ 	&expr_ops_bitwise,
+ 	&expr_ops_byteorder,
+ 	&expr_ops_cmp,
++	&expr_ops_regex,
+ 	&expr_ops_connlimit,
+ 	&expr_ops_counter,
+ 	&expr_ops_ct,
