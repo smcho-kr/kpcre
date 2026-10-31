@@ -20,8 +20,13 @@
  * 
  *   Implements PCRE matching algorithm:
  *
- *   Note: Obviously, it's possible that a matching could be spread over 
- *   multiple blocks, in that case this code won't find any coincidence.
+ *   Note: This engine searches each get_next_block() result independently
+ *   and cannot match across block boundaries. For skb-backed searches, a
+ *   block is a contiguous memory region; one packet may contain several
+ *   blocks. These memory boundaries are distinct from IP fragmentation.
+ *   No TCP state is retained between packets. For bounded matching across
+ *   sequence-contiguous TCP payloads, use the separate xt_ids or nft_regex
+ *   module with window_packets > 1.
  *   
  */
 
