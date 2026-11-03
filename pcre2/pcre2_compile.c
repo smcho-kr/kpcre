@@ -8865,7 +8865,7 @@ stack_parsed_pattern = kmem_cache_alloc(stack_parsed_pattern_cache, GFP_ATOMIC);
 named_groups = kmem_cache_alloc(named_groups_cache, GFP_ATOMIC);
 c16workspace = kmem_cache_alloc(c16workspace_cache, GFP_ATOMIC);
 
-if (stack_groupinfo_cache == NULL \
+if (stack_groupinfo == NULL \
         || stack_parsed_pattern == NULL \
         || named_groups == NULL \
         || c16workspace == NULL) {
@@ -8879,6 +8879,7 @@ if (stack_groupinfo_cache == NULL \
     if (c16workspace)
         kmem_cache_free(c16workspace_cache, c16workspace);
 
+    *errorptr = ERR21;
     return NULL;
 }
 

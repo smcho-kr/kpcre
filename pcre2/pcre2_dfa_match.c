@@ -418,17 +418,23 @@ BOOL reset_could_continue = FALSE;
 #ifdef __KERNEL__
 PCRE2_SIZE *local_offsets;
 int *local_workspace;
-
-local_offsets = kmem_cache_alloc(local_offsets_cache, GFP_ATOMIC);
-if (unlikely(local_offsets == NULL))
-	panic("%s: Out of memory", __func__);
-
-local_workspace = kmem_cache_alloc(local_workspace_cache, GFP_ATOMIC);
-if (unlikely(local_workspace == NULL))
-	panic("%s: Out of memory", __func__);
 #endif
 
 if (rlevel++ > mb->match_limit_recursion) return PCRE2_ERROR_RECURSIONLIMIT;
+
+#ifdef __KERNEL__
+local_offsets = kmem_cache_alloc(local_offsets_cache, GFP_ATOMIC);
+if (unlikely(local_offsets == NULL))
+  return PCRE2_ERROR_NOMEMORY;
+
+local_workspace = kmem_cache_alloc(local_workspace_cache, GFP_ATOMIC);
+if (unlikely(local_workspace == NULL))
+  {
+  kmem_cache_free(local_offsets_cache, local_offsets);
+  return PCRE2_ERROR_NOMEMORY;
+  }
+#endif
+
 offsetcount &= (uint32_t)(-2);  /* Round down */
 
 wscount -= 2;
@@ -2629,7 +2635,7 @@ for (;;)
 #endif
           rlevel);                              /* function recursion level */
 
-        if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) return rc;
+        if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) RETURN_DFA(rc);
         if ((rc >= 0) == (codevalue == OP_ASSERT || codevalue == OP_ASSERTBACK))
             { ADD_ACTIVE((int)(endasscode + LINK_SIZE + 1 - start_code), 0); }
         }
@@ -2758,7 +2764,7 @@ for (;;)
 #endif
             rlevel);                              /* function recursion level */
 
-          if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) return rc;
+          if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) RETURN_DFA(rc);
           if ((rc >= 0) ==
                 (condcode == OP_ASSERT || condcode == OP_ASSERTBACK))
             { ADD_ACTIVE((int)(endasscode + LINK_SIZE + 1 - start_code), 0); }

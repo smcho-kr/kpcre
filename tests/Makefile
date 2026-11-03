@@ -9,3 +9,4 @@ modules clean:
 
 check:
 	sh test_kernel_exec.sh
+	python3 test_scratch_alloc.py

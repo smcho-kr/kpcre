@@ -65,7 +65,7 @@ int r;
 sljit_u8 *local_space = kmem_cache_alloc(local_space_cache, GFP_ATOMIC);
 
 if (unlikely(local_space == NULL))
-    panic("%s: Out of memory", __func__);
+    return PCRE2_ERROR_NOMEMORY;
 
 local_stack.top = (sljit_sw)local_space;
 local_stack.base = local_stack.top;
